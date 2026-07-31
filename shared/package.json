@@ -1,0 +1,14 @@
+{
+  "name": "krishi-market-shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "types/index.ts",
+  "types": "types/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
+}
