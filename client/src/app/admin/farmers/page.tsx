@@ -249,7 +249,7 @@ export default function AdminUsersPage() {
           <div className="mb-xl flex flex-col md:flex-row md:items-end justify-between gap-lg">
             <div>
               <h2 className="font-headline-lg text-headline-lg text-primary mb-xs">User Management</h2>
-              <p className="text-body-lg text-on-surface-variant">Maintain Krishi Market's ecosystem of growers and consumers.</p>
+              <p className="text-body-lg text-on-surface-variant">Maintain Krishi Market&apos;s ecosystem of growers and consumers.</p>
             </div>
             {/* Metric Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-md w-full md:w-auto">

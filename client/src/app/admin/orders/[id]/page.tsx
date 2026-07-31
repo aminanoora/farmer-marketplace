@@ -552,7 +552,7 @@ export default function AdminOrderDetailPage() {
               <div>
                 <h3 className="font-headline-md text-headline-md text-primary">Change Order Status</h3>
                 <p className="text-on-surface-variant font-body-md mt-2">
-                  This will change the order status from <strong>"{getStatusConfig(order.status).label}"</strong> to <strong>"{getStatusConfig(confirmStatus).label}"</strong>.
+                  This will change the order status from <strong>&quot;{getStatusConfig(order.status).label}&quot;</strong> to <strong>&quot;{getStatusConfig(confirmStatus).label}&quot;</strong>.
                   {confirmStatus === "cancelled"
                     ? " The customer will be notified and a refund may be initiated. This action cannot be undone."
                     : " The customer will be notified of the update."}
