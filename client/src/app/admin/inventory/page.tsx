@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
@@ -389,8 +390,8 @@ export default function AdminInventoryPage() {
                       <tr key={p._id} className="hover:bg-surface-container transition-colors group">
                         <td className="px-lg py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-container flex items-center justify-center flex-shrink-0">
-                              {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" /> : <span className="material-symbols-outlined text-on-surface-variant text-[18px]">agriculture</span>}
+                            <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-surface-container flex items-center justify-center flex-shrink-0">
+                              {p.images?.[0] ? <Image fill sizes="40px" src={p.images[0]} alt={p.name} className="object-cover" /> : <span className="material-symbols-outlined text-on-surface-variant text-[18px]">agriculture</span>}
                             </div>
                             <div>
                               <Link href={`/admin/inventory/${p._id}`} className="font-label-md text-on-surface hover:text-primary transition-colors">{p.name}</Link>

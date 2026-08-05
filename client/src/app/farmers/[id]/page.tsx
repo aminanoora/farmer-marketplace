@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { consumerAPI } from "@/lib/api";
@@ -208,14 +209,14 @@ export default function FarmerDetailPage() {
           <div className="px-lg pb-lg relative">
             {/* Avatar */}
             <div className="flex justify-center md:justify-start -mt-16 mb-md relative z-10">
-              <div className="w-28 h-28 rounded-full border-4 border-white overflow-hidden shadow-lg bg-surface-container">
+              <div className="relative w-28 h-28 rounded-full border-4 border-white overflow-hidden shadow-lg bg-surface-container">
                 {farmer.avatar ? (
-                  <img
-                    className="w-full h-full object-cover"
+                  <Image
+                    fill
+                    sizes="112px"
+                    className="object-cover"
                     alt={farmer.name}
                     src={farmer.avatar}
-                    loading="lazy"
-                    decoding="async"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-primary/10">
@@ -367,12 +368,12 @@ export default function FarmerDetailPage() {
                     {/* Image */}
                     <Link href={`/marketplace/${product._id}`} className="relative aspect-[4/3] overflow-hidden bg-surface-container-high block">
                       {imageSrc ? (
-                        <img
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        <Image
+                          fill
+                          sizes="(max-width: 1024px) 50vw, 25vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-110"
                           alt={product.name}
                           src={imageSrc}
-                          loading="lazy"
-                          decoding="async"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">

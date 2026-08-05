@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { farmerAPI, consumerAPI } from "@/lib/api";
 import { useNotification } from "@/lib/notification-context";
@@ -393,7 +394,7 @@ export default function FarmerProductsPage() {
                             >
                               {product.images && product.images.length > 0 ? (
                                 <div className="relative w-full h-full">
-                                  <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover/preview:scale-110 transition-transform duration-300" />
+                                  <Image fill sizes="56px" src={product.images[0]} alt={product.name} className="object-cover group-hover/preview:scale-110 transition-transform duration-300" />
                                   <div className="absolute inset-0 bg-black/0 group-hover/preview:bg-black/20 transition-colors flex items-center justify-center">
                                     <span className="material-symbols-outlined text-white/0 group-hover/preview:text-white/90 text-lg transition-all">zoom_in</span>
                                   </div>
@@ -586,10 +587,13 @@ export default function FarmerProductsPage() {
                   swipeDeltaX.current = 0;
                 }}
               >
-                <img
+                <Image
                   src={images[currentIndex]}
                   alt={product.name + " — Image " + (currentIndex + 1)}
                   className="w-full max-h-[75vh] object-contain pointer-events-none"
+                  width={1024}
+                  height={768}
+                  unoptimized
                   draggable={false}
                 />
 

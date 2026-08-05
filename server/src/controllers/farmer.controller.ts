@@ -3,6 +3,7 @@ import User from "../models/User";
 import Product from "../models/Product";
 import Order from "../models/Order";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { uploadFilesToBlob, deleteBlobs } from "../middleware/upload.middleware";
 
 /* ─── Profile ─────────────────────────────────── */
 export const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -198,12 +199,11 @@ export const addProduct = async (req: AuthRequest, res: Response): Promise<void>
 
     const productData: Record<string, any> = { ...req.body };
 
-    // Handle uploaded files
+    // Handle uploaded files — images are stored on Vercel Blob, so each entry
+    // is an absolute public URL (serverless functions have no persistent disk).
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       const files = req.files as Express.Multer.File[];
-      productData.images = files.map(
-        (f) => `/uploads/${f.filename}`
-      );
+      productData.images = await uploadFilesToBlob(files);
     } else {
       // Never trust an "images" field in the request body — the only valid
       // source is multipart file uploads. Prevents confusing CastErrors like
@@ -294,10 +294,10 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
       updatedImages = product.images || [];
     }
 
-    // Add newly uploaded images
+    // Add newly uploaded images (uploaded to Vercel Blob, absolute URLs)
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       const files = req.files as Express.Multer.File[];
-      const newImagePaths = files.map((f) => `/uploads/${f.filename}`);
+      const newImagePaths = await uploadFilesToBlob(files);
       updatedImages = [...updatedImages, ...newImagePaths].slice(0, 4);
     }
 
@@ -312,6 +312,16 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
     if (!updated) {
       res.status(404).json({ message: "Product not found" });
       return;
+    }
+
+    // Delete Blob objects for images the farmer removed (best-effort)
+    const removedImages = (product.images || []).filter(
+      (img) => !updatedImages.includes(img)
+    );
+    if (removedImages.length > 0) {
+      await deleteBlobs(removedImages).catch((err) =>
+        console.error("[Blob] Failed to delete removed images:", err)
+      );
     }
 
     res.json({ product: updated });
@@ -334,6 +344,14 @@ export const deleteProduct = async (req: AuthRequest, res: Response): Promise<vo
       res.status(404).json({ message: "Product not found" });
       return;
     }
+
+    // Clean up the product's images on Vercel Blob (best-effort)
+    if (product.images && product.images.length > 0) {
+      await deleteBlobs(product.images).catch((err) =>
+        console.error("[Blob] Failed to delete product images:", err)
+      );
+    }
+
     res.json({ message: "Product deleted successfully" });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

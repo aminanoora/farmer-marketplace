@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { farmerAPI } from "@/lib/api";
@@ -209,12 +210,14 @@ export default function ProductDetailPage() {
         {/* ─── Left: Image Gallery (3 cols) ─── */}
         <div className="lg:col-span-3">
           {/* Main Image */}
-          <div className="bg-white rounded-2xl border border-outline-variant overflow-hidden mb-4 aspect-[4/3]">
+          <div className="relative bg-white rounded-2xl border border-outline-variant overflow-hidden mb-4 aspect-[4/3]">
             {images[selectedImage] ? (
-              <img
+              <Image
+                fill
+                sizes="(max-width: 1024px) 100vw, 60vw"
                 src={images[selectedImage]}
                 alt={product.name}
-                className="w-full h-full object-cover"
+                className="object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-surface-container-high">
@@ -233,13 +236,13 @@ export default function ProductDetailPage() {
                 <button
                   key={idx}
                   onClick={() => setSelectedImage(idx)}
-                  className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
+                  className={`relative flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
                     idx === selectedImage
                       ? "border-primary ring-2 ring-primary/20"
                       : "border-outline-variant hover:border-primary/50"
                   }`}
                 >
-                  <img src={img} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" />
+                  <Image fill sizes="80px" src={img} alt={`${product.name} ${idx + 1}`} className="object-cover" />
                 </button>
               ))}
             </div>

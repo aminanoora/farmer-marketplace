@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { consumerAPI } from "@/lib/api";
 import SiteHeader from "@/components/site-header";
@@ -186,9 +187,9 @@ export default function FarmersPage() {
                     className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-lg flex flex-col items-center text-center transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group"
                   >
                     {/* Avatar */}
-                    <div className="w-24 h-24 rounded-full overflow-hidden bg-surface-container-high border-2 border-surface-variant mb-4 group-hover:border-primary transition-colors">
+                    <div className="relative w-24 h-24 rounded-full overflow-hidden bg-surface-container-high border-2 border-surface-variant mb-4 group-hover:border-primary transition-colors">
                       {farmer.avatar ? (
-                        <img className="w-full h-full object-cover" src={farmer.avatar} alt={farmer.name} loading="lazy" decoding="async" onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/400x300/e4e2dd/414844?text=${encodeURIComponent(farmer.name.charAt(0))}`; } }} />
+                        <Image fill sizes="96px" className="object-cover" src={farmer.avatar} alt={farmer.name} onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/400x300/e4e2dd/414844?text=${encodeURIComponent(farmer.name.charAt(0))}`; } }} />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-primary/10">
                           <span className="material-symbols-outlined text-[40px] text-primary">agriculture</span>

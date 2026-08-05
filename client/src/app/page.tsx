@@ -86,6 +86,31 @@ const FALLBACK_CATEGORIES: Category[] = [
   { _id: "4", name: "Grains", slug: "grains", icon: "" },
 ];
 
+// Category slug → representative image (stable Unsplash CDN URLs, verified).
+// Keep in sync with the seeded categories (scripts/seed.ts).
+const CATEGORY_IMAGE_MAP: Record<string, string> = {
+  vegetables:
+    "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=400&q=80",
+  fruits:
+    "https://images.unsplash.com/photo-1619566636858-adf3ef46400b?auto=format&fit=crop&w=400&q=80",
+  dairy:
+    "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=400&q=80",
+  grains:
+    "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=400&q=80",
+};
+
+// Resolve a category image by slug (then name). Unknown categories fall back to
+// a neutral letter placeholder instead of a broken/empty image.
+function getCategoryImage(cat: Category): string {
+  const slug = cat.slug?.toLowerCase();
+  if (slug && CATEGORY_IMAGE_MAP[slug]) return CATEGORY_IMAGE_MAP[slug];
+  const name = cat.name?.toLowerCase();
+  if (name && CATEGORY_IMAGE_MAP[name]) return CATEGORY_IMAGE_MAP[name];
+  return `https://placehold.co/400x400/e4e2dd/414844?text=${encodeURIComponent(
+    cat.name?.charAt(0) || "?"
+  )}`;
+}
+
 export default function HomePage() {
   const { isAuthenticated } = useAuth();
   const { addItem } = useCart();
@@ -418,9 +443,11 @@ export default function HomePage() {
                                     onClick={() => clearSearch()}
                                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-container-high transition-colors text-left"
                                   >
-                                    <div className="w-12 h-12 rounded-lg bg-surface-variant overflow-hidden flex-shrink-0">
-                                      <img
-                                        className="w-full h-full object-cover"
+                                    <div className="relative w-12 h-12 rounded-lg bg-surface-variant overflow-hidden flex-shrink-0">
+                                      <Image
+                                        fill
+                                        sizes="48px"
+                                        className="object-cover"
                                         src={
                                           p.images?.[0] ||
                                           `https://placehold.co/100x100/e4e2dd/414844?text=${encodeURIComponent(
@@ -428,8 +455,6 @@ export default function HomePage() {
                                           )}`
                                         }
                                         alt={p.name}
-                                        loading="lazy"
-                                        decoding="async"
                                       />
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -472,9 +497,11 @@ export default function HomePage() {
                                     onClick={() => clearSearch()}
                                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-container-high transition-colors text-left"
                                   >
-                                    <div className="w-12 h-12 rounded-full bg-surface-variant overflow-hidden flex-shrink-0">
-                                      <img
-                                        className="w-full h-full object-cover"
+                                    <div className="relative w-12 h-12 rounded-full bg-surface-variant overflow-hidden flex-shrink-0">
+                                      <Image
+                                        fill
+                                        sizes="48px"
+                                        className="object-cover"
                                         src={
                                           f.avatar ||
                                           `https://placehold.co/100x100/e4e2dd/414844?text=${encodeURIComponent(
@@ -482,8 +509,6 @@ export default function HomePage() {
                                           )}`
                                         }
                                         alt={f.name}
-                                        loading="lazy"
-                                        decoding="async"
                                       />
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -580,7 +605,7 @@ export default function HomePage() {
               <CategoryCard
                 key={cat._id}
                 title={cat.name}
-                src={`https://placehold.co/400x400/e4e2dd/414844?text=${cat.name.charAt(0)}`}
+                src={getCategoryImage(cat)}
               />
             ))}
           </div>
@@ -904,12 +929,12 @@ function CategoryCard({ title, src }: { title: string; src: string }) {
   return (
     <div className="group cursor-pointer">
       <div className="aspect-square rounded-2xl overflow-hidden mb-3 relative bg-surface-container">
-        <img
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+        <Image
+          fill
+          sizes="(max-width: 768px) 50vw, 25vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-110"
           alt={title}
           src={src}
-          loading="lazy"
-          decoding="async"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
           <span className="text-surface-container-lowest font-headline-md">
@@ -937,13 +962,13 @@ function FarmerCard({
   return (
     <div className="flex-none w-72 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
       <div className="flex flex-col items-center text-center">
-        <div className="w-24 h-24 rounded-full overflow-hidden mb-4 border-2 border-primary-fixed">
-          <img
-            className="w-full h-full object-cover"
+        <div className="relative w-24 h-24 rounded-full overflow-hidden mb-4 border-2 border-primary-fixed">
+          <Image
+            fill
+            sizes="96px"
+            className="object-cover"
             alt={name}
             src={avatar}
-            loading="lazy"
-            decoding="async"
           />
         </div>
         <div className="flex items-center gap-1 mb-1">
@@ -1030,12 +1055,12 @@ function ProductCard({
     <Link href={`/marketplace/${id}`} className="block">
       <div className="flex flex-col group bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300">
         <div className="relative aspect-[4/3] overflow-hidden">
-          <img
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          <Image
+            fill
+            sizes="(max-width: 1024px) 50vw, 25vw"
+            className="object-cover transition-transform duration-700 group-hover:scale-110"
             alt={name}
             src={src}
-            loading="lazy"
-            decoding="async"
             onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/600x450/e4e2dd/414844?text=${encodeURIComponent(name)}`; } }}
           />
           {organic && (

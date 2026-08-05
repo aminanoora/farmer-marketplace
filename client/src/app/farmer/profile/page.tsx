@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { farmerAPI } from "@/lib/api";
@@ -304,9 +305,9 @@ export default function FarmerProfilePage() {
           >
             <div className="flex flex-col md:flex-row gap-6 items-start">
               <div className="relative group shrink-0">
-                <div className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-surface-container-low overflow-hidden bg-surface-container-high">
+                <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-surface-container-low overflow-hidden bg-surface-container-high">
                   {avatar ? (
-                    <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                    <Image fill sizes="112px" src={avatar} alt="Profile" className="object-cover" />
                   ) : (
                     <div className="w-full h-full bg-primary text-on-primary flex items-center justify-center text-3xl font-bold">{userInitial}</div>
                   )}

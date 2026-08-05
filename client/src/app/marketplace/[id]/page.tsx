@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { consumerAPI } from "@/lib/api";
@@ -340,12 +341,12 @@ export default function ProductDetailPage() {
           <div className="lg:col-span-7 space-y-md">
             <div className="aspect-[4/3] rounded-xl overflow-hidden border border-outline-variant bg-surface-container-low relative group">
               {currentImage ? (
-                <img
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                <Image
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 60vw"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
                   alt={product.name}
                   src={currentImage}
-                  loading="lazy"
-                  decoding="async"
                   onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/800x600/e4e2dd/414844?text=${encodeURIComponent(product.name)}`; } }}
                 />
               ) : (
@@ -368,18 +369,18 @@ export default function ProductDetailPage() {
                   <button
                     key={idx}
                     onClick={() => setSelectedImage(idx)}
-                    className={`aspect-square rounded-lg overflow-hidden transition-all duration-200 ${
+                    className={`relative aspect-square rounded-lg overflow-hidden transition-all duration-200 ${
                       idx === selectedImage
                         ? "border-2 border-primary ring-2 ring-primary/20"
                         : "border border-outline-variant hover:border-primary/50"
                     }`}
                   >
-                    <img
-                      className="w-full h-full object-cover"
+                    <Image
+                      fill
+                      sizes="100px"
+                      className="object-cover"
                       alt={`${product.name} view ${idx + 1}`}
                       src={img}
-                      loading="lazy"
-                      decoding="async"
                       onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/300x300/e4e2dd/414844?text=${encodeURIComponent(product.name)}`; } }}
                     />
                   </button>
@@ -704,14 +705,14 @@ export default function ProductDetailPage() {
             {/* Meet the Producer */}
             <section className="p-lg bg-primary rounded-xl text-white" style={{ boxShadow: "0 4px 20px -2px rgba(119, 87, 77, 0.12)" }}>
               <h2 className="font-headline-md text-headline-md mb-md">Meet the Producer</h2>
-              <div className="aspect-video w-full rounded-lg overflow-hidden mb-md border border-on-primary/20">
+              <div className="relative aspect-video w-full rounded-lg overflow-hidden mb-md border border-on-primary/20">
                 {product.farmer?.avatar ? (
-                  <img
-                    className="w-full h-full object-cover"
+                  <Image
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 33vw"
+                    className="object-cover"
                     alt={farmName}
                     src={product.farmer.avatar}
-                    loading="lazy"
-                    decoding="async"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-primary-container/50">
@@ -804,12 +805,12 @@ export default function ProductDetailPage() {
                   >
                     <div className="aspect-[4/5] relative overflow-hidden">
                       {rpImg ? (
-                        <img
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        <Image
+                          fill
+                          sizes="(max-width: 1024px) 50vw, 25vw"
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
                           alt={rp.name}
                           src={rpImg}
-                          loading="lazy"
-                          decoding="async"
                           onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/400x500/e4e2dd/414844?text=${encodeURIComponent(rp.name)}`; } }}
                         />
                       ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { farmerAPI, consumerAPI } from "@/lib/api";
@@ -284,10 +285,18 @@ export default function AddProductPage() {
       setErrors((prev) => ({ ...prev, images: "Only JPEG, PNG, WebP, and GIF images are allowed." }));
       return;
     }
-    // Validate file size (5MB each)
-    const oversized = files.find((f) => f.size > 5 * 1024 * 1024);
+    // Validate file size (4MB each — Vercel serverless body limit is 4.5MB)
+    const oversized = files.find((f) => f.size > 4 * 1024 * 1024);
     if (oversized) {
-      setErrors((prev) => ({ ...prev, images: "Each image must be under 5MB." }));
+      setErrors((prev) => ({ ...prev, images: "Each image must be under 4MB." }));
+      return;
+    }
+    // Validate total size — Vercel caps the entire request body at 4.5MB
+    const totalSize =
+      form.images.reduce((sum, f) => sum + f.size, 0) +
+      files.reduce((sum, f) => sum + f.size, 0);
+    if (totalSize > 4 * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, images: "Total image size must be under 4MB. Please use smaller photos." }));
       return;
     }
     setForm((prev) => ({
@@ -690,7 +699,7 @@ export default function AddProductPage() {
                   Click to upload or drag &amp; drop
                 </p>
                 <p className="text-[11px] text-on-surface-variant/70 mt-1">
-                  JPEG, PNG, WebP, GIF — Max 5MB each
+                  JPEG, PNG, WebP, GIF — Max 4MB total
                 </p>
                 <p className="text-[11px] text-primary font-bold mt-1">
                   {form.images.length}/4 photos selected
@@ -719,10 +728,13 @@ export default function AddProductPage() {
                     key={index}
                     className="relative group aspect-square rounded-xl overflow-hidden border border-outline-variant bg-surface-container-high"
                   >
-                    <img
+                    <Image
+                      fill
+                      unoptimized
+                      sizes="200px"
                       src={URL.createObjectURL(file)}
                       alt={`Preview ${index + 1}`}
-                      className="w-full h-full object-cover"
+                      className="object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button

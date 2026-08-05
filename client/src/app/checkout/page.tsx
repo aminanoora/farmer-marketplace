@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
@@ -406,9 +407,9 @@ export default function CheckoutPage() {
               <div className="space-y-md mb-lg max-h-80 overflow-y-auto">
                 {items.map((item) => (
                   <div key={item.productId} className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-surface-variant flex-shrink-0">
+                    <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-surface-variant flex-shrink-0">
                       {item.image ? (
-                        <img className="w-full h-full object-cover" src={item.image} alt={item.name} loading="lazy" decoding="async" />
+                        <Image fill sizes="56px" className="object-cover" src={item.image} alt={item.name} />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <span className="material-symbols-outlined text-[20px] text-outline">eco</span>

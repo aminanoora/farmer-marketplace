@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { consumerAPI } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -319,12 +320,12 @@ export default function MarketplacePage() {
                     {/* Image Container */}
                     <div className="relative aspect-[4/3] overflow-hidden bg-surface-container-high">
                       {imageSrc ? (
-                        <img
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        <Image
+                          fill
+                          sizes="(max-width: 1024px) 50vw, 25vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-110"
                           alt={product.name}
                           src={imageSrc}
-                          loading="lazy"
-                          decoding="async"
                           onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/600x450/e4e2dd/414844?text=${encodeURIComponent(product.name)}`; } }}
                         />
                       ) : (

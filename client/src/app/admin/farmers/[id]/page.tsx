@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
@@ -480,8 +481,8 @@ export default function AdminUserDetailPage() {
                               <tr key={p._id} className="hover:bg-surface-container-lowest transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-container flex items-center justify-center flex-shrink-0">
-                                      {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" /> : <span className="material-symbols-outlined text-on-surface-variant text-[18px]">agriculture</span>}
+                                    <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-surface-container flex items-center justify-center flex-shrink-0">
+                                      {p.images?.[0] ? <Image fill sizes="40px" src={p.images[0]} alt={p.name} className="object-cover" /> : <span className="material-symbols-outlined text-on-surface-variant text-[18px]">agriculture</span>}
                                     </div>
                                     <div><p className="font-label-md text-on-surface">{p.name}</p>{p.category?.name && <p className="text-label-sm text-on-surface-variant">{p.category.name}</p>}</div>
                                   </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
@@ -72,9 +73,9 @@ export default function CartPage() {
               {items.map((item) => (
                 <div key={item.productId} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-md md:p-lg flex flex-col sm:flex-row gap-md transition-all hover:shadow-md">
                   {/* Image */}
-                  <div className="w-full sm:w-28 h-28 rounded-xl overflow-hidden bg-surface-variant flex-shrink-0">
+                  <div className="relative w-full sm:w-28 h-28 rounded-xl overflow-hidden bg-surface-variant flex-shrink-0">
                     {item.image ? (
-                      <img className="w-full h-full object-cover" src={item.image} alt={item.name} loading="lazy" decoding="async" />
+                      <Image fill sizes="112px" className="object-cover" src={item.image} alt={item.name} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="material-symbols-outlined text-[36px] text-outline">eco</span>

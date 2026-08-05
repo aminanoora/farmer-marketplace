@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { farmerAPI, consumerAPI } from "@/lib/api";
@@ -261,9 +262,17 @@ export default function EditProductPage() {
       setErrors((prev) => ({ ...prev, images: "Only JPEG, PNG, WebP, and GIF images are allowed." }));
       return;
     }
-    const oversized = files.find((f) => f.size > 5 * 1024 * 1024);
+    const oversized = files.find((f) => f.size > 4 * 1024 * 1024);
     if (oversized) {
-      setErrors((prev) => ({ ...prev, images: "Each image must be under 5MB." }));
+      setErrors((prev) => ({ ...prev, images: "Each image must be under 4MB." }));
+      return;
+    }
+    // Validate total size — Vercel caps the entire request body at 4.5MB
+    const totalNewSize =
+      form.newImages.reduce((sum, f) => sum + f.size, 0) +
+      files.reduce((sum, f) => sum + f.size, 0);
+    if (totalNewSize > 4 * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, images: "Total image size must be under 4MB. Please use smaller photos." }));
       return;
     }
     setForm((prev) => ({ ...prev, newImages: [...prev.newImages, ...files].slice(0, 4 - prev.existingImages.length) }));
@@ -507,7 +516,7 @@ export default function EditProductPage() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="Choose photos" />
                 <span className="material-symbols-outlined text-[48px] text-outline mb-2">add_photo_alternate</span>
                 <p className="font-label-md text-label-md text-on-surface-variant">Click to upload or drag &amp; drop</p>
-                <p className="text-[11px] text-on-surface-variant/70 mt-1">JPEG, PNG, WebP, GIF — Max 5MB each</p>
+                <p className="text-[11px] text-on-surface-variant/70 mt-1">JPEG, PNG, WebP, GIF — Max 4MB total</p>
                 <p className="text-[11px] text-primary font-bold mt-1">{totalImages}/4 photos</p>
               </div>
             )}
@@ -525,7 +534,7 @@ export default function EditProductPage() {
                 {form.existingImages.map((img, index) => (
                   <div key={`existing-${index}`}
                     className="relative group aspect-square rounded-xl overflow-hidden border border-outline-variant bg-surface-container-high">
-                    <img src={img.url} alt={`Existing ${index + 1}`} className="w-full h-full object-cover" />
+                    <Image fill sizes="200px" src={img.url} alt={`Existing ${index + 1}`} className="object-cover" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button type="button" onClick={() => removeExistingImage(index)}
                         className="w-8 h-8 bg-error-container text-error rounded-full flex items-center justify-center hover:bg-error hover:text-on-error transition-colors" title="Remove image">
@@ -542,7 +551,7 @@ export default function EditProductPage() {
                 {form.newImages.map((file, index) => (
                   <div key={`new-${index}`}
                     className="relative group aspect-square rounded-xl overflow-hidden border border-outline-variant bg-surface-container-high">
-                    <img src={URL.createObjectURL(file)} alt={`New ${index + 1}`} className="w-full h-full object-cover" />
+                    <Image fill unoptimized sizes="200px" src={URL.createObjectURL(file)} alt={`New ${index + 1}`} className="object-cover" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button type="button" onClick={() => removeNewImage(index)}
                         className="w-8 h-8 bg-error-container text-error rounded-full flex items-center justify-center hover:bg-error hover:text-on-error transition-colors" title="Remove image">

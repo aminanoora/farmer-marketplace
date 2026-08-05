@@ -1,0 +1,14 @@
+# Railway deployment config for the Krishi Market backend (server workspace).
+# See https://docs.railway.com/reference/config-as-code
+
+[build]
+builder = "NIXPACKS"
+# Installs all workspace deps at the repo root, then compiles only the server.
+buildCommand = "npm run build --workspace=server"
+
+[deploy]
+# Root `npm start` → `npm run start --workspace=server` → `node dist/index.js`
+startCommand = "npm run start"
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

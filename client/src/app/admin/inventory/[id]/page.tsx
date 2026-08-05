@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
@@ -306,10 +307,12 @@ export default function AdminInventoryProductDetailPage() {
               <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-surface-container flex items-center justify-center flex-shrink-0">
                 <span className="material-symbols-outlined text-on-surface-variant text-[24px]">agriculture</span>
                 {safeImage && (
-                  <img
+                  <Image
+                    fill
+                    sizes="56px"
                     src={safeImage}
                     alt={product.name}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="object-cover"
                     onError={(e) => {
                       const el = e.currentTarget;
                       if (el.dataset.fb) return;
@@ -357,12 +360,14 @@ export default function AdminInventoryProductDetailPage() {
                   <span className="material-symbols-outlined">photo_library</span>Photos
                 </h3>
                 <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1 aspect-[4/3] rounded-xl overflow-hidden bg-surface-container flex items-center justify-center border border-outline-variant">
+                  <div className="relative flex-1 aspect-[4/3] rounded-xl overflow-hidden bg-surface-container flex items-center justify-center border border-outline-variant">
                     {safeImage ? (
-                      <img
+                      <Image
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
                         src={safeImage}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                        className="object-cover"
                         onError={(e) => {
                           const el = e.currentTarget;
                           if (el.dataset.fb) return;
@@ -381,9 +386,9 @@ export default function AdminInventoryProductDetailPage() {
                         <button
                           key={i}
                           onClick={() => setActiveImage(i)}
-                          className={"w-16 h-16 rounded-lg overflow-hidden border-2 transition-all " + (i === Math.min(activeImage, images.length - 1) ? "border-primary shadow-md" : "border-outline-variant opacity-60 hover:opacity-100")}
+                          className={"relative w-16 h-16 rounded-lg overflow-hidden border-2 transition-all " + (i === Math.min(activeImage, images.length - 1) ? "border-primary shadow-md" : "border-outline-variant opacity-60 hover:opacity-100")}
                         >
-                          <img src={img} alt={product.name + " " + (i + 1)} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                          <Image fill sizes="64px" src={img} alt={product.name + " " + (i + 1)} className="object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                         </button>
                       ))}
                     </div>
@@ -505,10 +510,12 @@ export default function AdminInventoryProductDetailPage() {
                   <div className="relative w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg flex-shrink-0">
                     <span>{farmerInitials}</span>
                     {farmer.avatar && (
-                      <img
+                      <Image
+                        fill
+                        sizes="56px"
                         src={farmer.avatar}
                         alt={farmer.name}
-                        className="absolute inset-0 w-full h-full object-cover rounded-full"
+                        className="object-cover rounded-full"
                         onError={(e) => {
                           const el = e.currentTarget;
                           if (el.dataset.fb) return;

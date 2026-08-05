@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useWishlist } from "@/lib/wishlist-context";
 import { useCart } from "@/lib/cart-context";
@@ -62,7 +63,7 @@ export default function WishlistPage() {
                   {/* Image */}
                   <Link href={"/marketplace/" + item.productId} className="relative aspect-[4/3] overflow-hidden bg-surface-container-high block">
                     {item.image ? (
-                      <img className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" src={item.image} alt={item.name} loading="lazy" decoding="async" />
+                      <Image fill sizes="(max-width: 1024px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-110" src={item.image} alt={item.name} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <span className="material-symbols-outlined text-[64px] text-outline">eco</span>

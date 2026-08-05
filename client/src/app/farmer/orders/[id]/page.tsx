@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -444,14 +445,14 @@ export default function FarmerOrderDetailPage() {
             <div className="divide-y divide-outline-variant">
               {order.items.map((item, idx) => (
                 <div key={`${item.product._id}-${idx}`} className="flex items-center gap-4 p-5">
-                  <div className="w-14 h-14 rounded-xl bg-surface-container-high overflow-hidden flex items-center justify-center flex-shrink-0 text-on-surface-variant">
+                  <div className="relative w-14 h-14 rounded-xl bg-surface-container-high overflow-hidden flex items-center justify-center flex-shrink-0 text-on-surface-variant">
                     {item.product?.images?.[0] ? (
-                      <img
+                      <Image
+                        fill
+                        sizes="56px"
                         src={item.product.images[0]}
                         alt={item.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
+                        className="object-cover"
                         onError={(e) => {
                           // Avoid infinite loop: only swap once per broken image
                           const el = e.currentTarget;

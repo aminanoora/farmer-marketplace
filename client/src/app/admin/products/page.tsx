@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
@@ -459,10 +460,10 @@ export default function AdminProductApprovalsPage() {
                             <tr key={p._id} className="hover:bg-gray-50 transition-colors">
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200">
+                                  <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0 border border-gray-200">
                                     {p.images?.[0] ? (
-                                      <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover"
-                                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                                      <Image fill sizes="48px" src={p.images[0]} alt={p.name} className="object-cover"
+                                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                                     ) : (
                                       <span className="material-symbols-outlined text-gray-400 text-xl">image</span>
                                     )}
@@ -589,8 +590,8 @@ export default function AdminProductApprovalsPage() {
             <div className="relative bg-white w-full max-w-lg shadow-2xl border-l border-gray-200 overflow-y-auto animate-slideInRight">
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
-                    {p.images?.[0] ? <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" /> : <span className="material-symbols-outlined text-gray-400">image</span>}
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                    {p.images?.[0] ? <Image fill sizes="40px" src={p.images[0]} alt={p.name} className="object-cover" /> : <span className="material-symbols-outlined text-gray-400">image</span>}
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{p.name}</h3>
@@ -610,8 +611,8 @@ export default function AdminProductApprovalsPage() {
                     <p className="text-xs text-gray-400 uppercase tracking-wider font-medium mb-2">Images</p>
                     <div className="grid grid-cols-2 gap-2">
                       {p.images.map((img, idx) => (
-                        <div key={idx} className="aspect-video rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                          <img src={img} alt={p.name} className="w-full h-full object-cover" />
+                        <div key={idx} className="relative aspect-video rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+                          <Image fill sizes="(max-width: 768px) 100vw, 300px" src={img} alt={p.name} className="object-cover" />
                         </div>
                       ))}
                     </div>
@@ -691,8 +692,8 @@ export default function AdminProductApprovalsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl w-full">
-                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
-                    {prod.images?.[0] ? <img src={prod.images[0]} alt="" className="w-full h-full object-cover" /> : null}
+                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
+                    {prod.images?.[0] ? <Image fill sizes="40px" src={prod.images[0]} alt="" className="object-cover" /> : null}
                   </div>
                   <div className="text-left flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{prod.name}</p>

@@ -8,7 +8,6 @@ interface EnvConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
   clientUrl: string;
-  uploadDir: string;
   maxFileSize: number;
   resendApiKey?: string;
 }
@@ -28,8 +27,9 @@ const validateEnv = (): EnvConfig => {
     jwtSecret: process.env.JWT_SECRET!,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
     clientUrl: process.env.CLIENT_URL || "http://localhost:3000",
-    uploadDir: process.env.UPLOAD_DIR || "uploads",
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "5242880", 10),
+    // 4 MB default — Vercel serverless functions cap the total request body
+    // at 4.5 MB, so a larger per-file limit would never be reachable.
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "4194304", 10),
     resendApiKey: process.env.RESEND_API_KEY,
   };
 };

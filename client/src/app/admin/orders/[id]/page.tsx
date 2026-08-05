@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
@@ -339,9 +340,9 @@ export default function AdminOrderDetailPage() {
                         <tr key={idx} className="hover:bg-surface-container-low transition-colors">
                           <td className="py-6">
                             <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0 flex items-center justify-center">
+                              <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0 flex items-center justify-center">
                                 {item.product.images?.[0] ? (
-                                  <img src={item.product.images[0]} alt={item.name} className="w-full h-full object-cover" />
+                                  <Image fill sizes="64px" src={item.product.images[0]} alt={item.name} className="object-cover" />
                                 ) : (
                                   <span className="material-symbols-outlined text-on-surface-variant">agriculture</span>
                                 )}
