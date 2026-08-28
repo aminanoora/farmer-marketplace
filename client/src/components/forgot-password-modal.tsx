@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { authAPI } from "@/lib/api";
+import { authAPI, getApiErrorMessage } from "@/lib/api";
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface ForgotPasswordModalProps {
 
 export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProps) {
   const [email, setEmail] = useState("");
-  const [step, setStep] = useState<"email" | "sent" | "done">("email");
+  const [step, setStep] = useState<"email" | "sent">("email");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,8 +33,8 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
     try {
       await authAPI.forgotPassword(email);
       setStep("sent");
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Something went wrong.");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Something went wrong."));
     } finally {
       setLoading(false);
     }
@@ -46,7 +46,7 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
         {/* Header */}
         <div className="flex items-center justify-between p-6 pb-0">
           <h3 className="font-headline-md text-headline-md text-primary">
-            {step === "done" ? "Password Reset" : "Reset Password"}
+            {step === "sent" ? "Password Reset" : "Reset Password"}
           </h3>
           <button onClick={onClose} className="p-1 text-on-surface-variant hover:text-on-surface rounded-full hover:bg-surface-container-high transition-colors" aria-label="Close">
             <span className="material-symbols-outlined">close</span>

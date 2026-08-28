@@ -54,5 +54,9 @@ productSchema.index({ category: 1, isAvailable: 1 });
 productSchema.index({ farmer: 1 });
 productSchema.index({ name: "text", description: "text" });
 productSchema.index({ approvalStatus: 1 });
+// Farmer products page: filter by farmer + approval status
+productSchema.index({ farmer: 1, approvalStatus: 1 });
+// Featured products query on homepage
+productSchema.index({ isFeatured: 1, isAvailable: 1, approvalStatus: 1 });
 
 export default mongoose.model<IProduct>("Product", productSchema);

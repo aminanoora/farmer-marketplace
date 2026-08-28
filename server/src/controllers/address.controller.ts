@@ -1,13 +1,14 @@
 import { Response } from "express";
 import Address from "../models/Address";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { getErrorMessage } from "../utils/response";
 
 export const getAddresses = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const addresses = await Address.find({ user: req.user?._id }).sort("-isDefault -createdAt");
     res.json({ addresses });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -30,8 +31,8 @@ export const createAddress = async (req: AuthRequest, res: Response): Promise<vo
     });
     await address.save();
     res.status(201).json({ address });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -55,8 +56,8 @@ export const updateAddress = async (req: AuthRequest, res: Response): Promise<vo
     if (isDefault !== undefined) address.isDefault = isDefault;
     await address.save();
     res.json({ address });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -68,8 +69,8 @@ export const deleteAddress = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
     res.json({ message: "Address deleted successfully." });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -84,7 +85,7 @@ export const setDefaultAddress = async (req: AuthRequest, res: Response): Promis
     address.isDefault = true;
     await address.save();
     res.json({ address });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };

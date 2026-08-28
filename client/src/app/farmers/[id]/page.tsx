@@ -37,12 +37,6 @@ interface FarmerProduct {
 }
 
 /* ─── Helpers ────────────────────────────────── */
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-  });
-}
 
 function timeAgo(dateStr: string): string {
   const now = new Date();

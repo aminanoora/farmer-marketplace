@@ -4,37 +4,48 @@ import Category from "../models/Category";
 import Product from "../models/Product";
 import Review from "../models/Review";
 import Newsletter from "../models/Newsletter";
+import { getErrorMessage } from "../utils/response";
+import { escapeRegex } from "../utils/sanitize";
 
 /**
  * Get all homepage data in a single request
  */
 export const getHomepage = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const [categories, featuredFarmers, recentProducts] = await Promise.all([
-      Category.find({ isActive: true }).sort("name").lean(),
-      User.find({
-        role: "farmer",
-        verificationStatus: "verified",
-      })
-        .select("name farmName farmLocation cropTypes farmingMethod avatar verificationStatus")
-        .sort("-createdAt")
-        .limit(6)
-        .lean(),
-      Product.find({ isAvailable: true, approvalStatus: "approved" })
-        .populate("farmer", "name farmName avatar")
-        .populate("category", "name slug")
-        .sort("-createdAt")
-        .limit(8)
-        .lean(),
-    ]);
+    const [categories, featuredFarmers, recentProducts, featuredProducts] =
+      await Promise.all([
+        Category.find({ isActive: true }).sort("name").lean(),
+        User.find({
+          role: "farmer",
+          verificationStatus: "verified",
+        })
+          .select("name farmName farmLocation cropTypes farmingMethod avatar verificationStatus")
+          .sort("-createdAt")
+          .limit(6)
+          .lean(),
+        Product.find({ isAvailable: true, approvalStatus: "approved" })
+          .populate("farmer", "name farmName avatar")
+          .populate("category", "name slug")
+          .sort("-createdAt")
+          .limit(8)
+          .lean(),
+        // Featured products: farmer-marketed items shown prominently
+        Product.find({ isAvailable: true, approvalStatus: "approved", isFeatured: true })
+          .populate("farmer", "name farmName avatar")
+          .populate("category", "name slug")
+          .sort("-createdAt")
+          .limit(8)
+          .lean(),
+      ]);
 
     res.json({
       categories,
       featuredFarmers,
       recentProducts,
+      featuredProducts,
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -44,16 +55,17 @@ export const getHomepage = async (_req: Request, res: Response): Promise<void> =
 export const getFarmers = async (req: Request, res: Response): Promise<void> => {
   try {
     const { page = "1", limit = "20", search } = req.query;
-    const filter: Record<string, any> = {
+    const filter: Record<string, unknown> = {
       role: "farmer",
       verificationStatus: "verified",
     };
 
-    if (search) {
+    if (search && typeof search === "string") {
+      const safe = escapeRegex(search.trim());
       filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { farmName: { $regex: search, $options: "i" } },
-        { "farmLocation.village": { $regex: search, $options: "i" } },
+        { name: { $regex: safe, $options: "i" } },
+        { farmName: { $regex: safe, $options: "i" } },
+        { "farmLocation.village": { $regex: safe, $options: "i" } },
       ];
     }
 
@@ -80,8 +92,8 @@ export const getFarmers = async (req: Request, res: Response): Promise<void> => 
         pages: Math.ceil(total / limitNum),
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -143,8 +155,8 @@ export const getFarmer = async (req: Request, res: Response): Promise<void> => {
         totalReviews: reviews.length,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -163,8 +175,8 @@ export const getFeaturedFarmers = async (_req: Request, res: Response): Promise<
       .lean();
 
     res.json({ farmers });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -207,7 +219,7 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
     const skip = (pageNum - 1) * limitNum;
 
     /* ─── Product filter ───────────────────── */
-    const productFilter: Record<string, any> = {
+    const productFilter: Record<string, unknown> = {
       isAvailable: true,
       approvalStatus: "approved",
     };
@@ -218,28 +230,30 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
     if (category) productFilter.category = category;
     if (isOrganic !== undefined) productFilter.isOrganic = isOrganic === "true";
     if (minPrice || maxPrice) {
-      productFilter.price = {};
-      if (minPrice) productFilter.price.$gte = Number(minPrice);
-      if (maxPrice) productFilter.price.$lte = Number(maxPrice);
+      const priceRange: { $gte?: number; $lte?: number } = {};
+      if (minPrice) priceRange.$gte = Number(minPrice);
+      if (maxPrice) priceRange.$lte = Number(maxPrice);
+      productFilter.price = priceRange;
     }
 
     // Product sort
-    let productSort: Record<string, any> = { score: { $meta: "textScore" } };
+    let productSort: Record<string, 1 | -1 | { $meta: string }> = { score: { $meta: "textScore" } };
     if (sort === "price_asc") productSort = { price: 1 };
     else if (sort === "price_desc") productSort = { price: -1 };
     else if (sort === "newest") productSort = { createdAt: -1 };
 
     /* ─── Farmer filter ────────────────────── */
     // Use regex for farmer search (covers name, farm, location, crop types)
-    const farmerFilter: Record<string, any> = {
+    const safeQuery = escapeRegex(query);
+    const farmerFilter: Record<string, unknown> = {
       role: "farmer",
       verificationStatus: "verified",
       $or: [
-        { name: { $regex: query, $options: "i" } },
-        { farmName: { $regex: query, $options: "i" } },
-        { "farmLocation.village": { $regex: query, $options: "i" } },
-        { "farmLocation.district": { $regex: query, $options: "i" } },
-        { "farmLocation.state": { $regex: query, $options: "i" } },
+        { name: { $regex: safeQuery, $options: "i" } },
+        { farmName: { $regex: safeQuery, $options: "i" } },
+        { "farmLocation.village": { $regex: safeQuery, $options: "i" } },
+        { "farmLocation.district": { $regex: safeQuery, $options: "i" } },
+        { "farmLocation.state": { $regex: safeQuery, $options: "i" } },
       ],
     };
 
@@ -256,7 +270,7 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
       productQuery
         .populate("farmer", "name farmName")
         .populate("category", "name slug")
-        .sort(productsHaveTextSearch ? { score: { $meta: "textScore" } } : { createdAt: -1 })
+        .sort(productSort)
         .skip(skip)
         .limit(limitNum)
         .lean(),
@@ -280,8 +294,8 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
         pages: Math.ceil(productsTotal / limitNum),
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -292,13 +306,17 @@ export const subscribeToNewsletter = async (req: Request, res: Response): Promis
   try {
     const { email } = req.body;
 
-    if (!email) {
-      res.status(400).json({ message: "Email is required" });
+    // Basic email format validation (mirrors the client's input type="email")
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedEmail =
+      typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
+      res.status(400).json({ message: "A valid email address is required" });
       return;
     }
 
     // Check if already subscribed
-    const existing = await Newsletter.findOne({ email: email.toLowerCase() });
+    const existing = await Newsletter.findOne({ email: normalizedEmail });
     if (existing) {
       if (existing.isActive) {
         res.status(200).json({ message: "You're already subscribed!" });
@@ -312,9 +330,9 @@ export const subscribeToNewsletter = async (req: Request, res: Response): Promis
       return;
     }
 
-    await Newsletter.create({ email: email.toLowerCase() });
+    await Newsletter.create({ email: normalizedEmail });
     res.status(201).json({ message: "Thank you for subscribing! Stay tuned for fresh updates." });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };

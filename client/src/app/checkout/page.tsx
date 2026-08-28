@@ -8,7 +8,7 @@ import { useCart } from "@/lib/cart-context";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
 import SiteHeader from "@/components/site-header";
-import { consumerAPI } from "@/lib/api";
+import { consumerAPI, getApiErrorMessage } from "@/lib/api";
 
 interface AddressForm {
   fullName: string;
@@ -128,8 +128,8 @@ export default function CheckoutPage() {
       clearCart();
       showSuccess("Order placed successfully! 🎉");
       setSubmitted(true);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || "Failed to place order. Please try again.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to place order. Please try again.");
       setOrderError(msg);
       showErrorToast(msg);
     } finally {

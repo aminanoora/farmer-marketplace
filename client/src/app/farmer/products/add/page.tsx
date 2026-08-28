@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { farmerAPI, consumerAPI } from "@/lib/api";
+import { farmerAPI, consumerAPI, getApiErrorMessage } from "@/lib/api";
 import { useNotification } from "@/lib/notification-context";
 import { useAuth } from "@/lib/auth-context";
+import { formatCurrency } from "@shared/utils";
 
 // ─────────────────────────────────────────────────
 // Types
@@ -59,12 +60,6 @@ const UNITS = [
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
-function formatCurrency(amount: number): string {
-  return "₹" + amount.toLocaleString("en-IN", {
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 // ─────────────────────────────────────────────────
 // Form Field Components
@@ -412,11 +407,8 @@ export default function AddProductPage() {
       await farmerAPI.addProductWithImages(formData);
       showSuccess("Product added successfully! It is now pending admin approval. 🎉");
       router.push("/farmer/products");
-    } catch (err: any) {
-      const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to add product. Please try again.";
+    } catch (err: unknown) {
+      const message = getApiErrorMessage(err, "Failed to add product. Please try again.");
       showErrorToast(message);
       setSubmitError(message);
     } finally {

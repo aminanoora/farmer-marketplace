@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { consumerAPI } from "@/lib/api";
+import { consumerAPI, getApiErrorStatus, getApiErrorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useCart } from "@/lib/cart-context";
 import { useWishlist } from "@/lib/wishlist-context";
 import SiteHeader from "@/components/site-header";
+import { formatDate } from "@shared/utils";
 
 /* ─── Types ──────────────────────────────────── */
 interface FarmerInfo {
@@ -57,13 +58,6 @@ function isAuthenticated(): boolean {
   return !!localStorage.getItem("krishi_token");
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 const RATING_LABELS: Record<number, string> = {
   1: "Poor",
@@ -245,10 +239,10 @@ export default function ProductDetailPage() {
         setAverageRating(data.averageRating || 0);
         setTotalReviews(data.totalReviews || 0);
       });
-    } catch (err: any) {
-      if (err.response?.status === 400) {
-        setReviewError(err.response.data.message || "You have already reviewed this product.");
-      } else if (err.response?.status === 401) {
+    } catch (err: unknown) {
+      if (getApiErrorStatus(err) === 400) {
+        setReviewError(getApiErrorMessage(err, "You have already reviewed this product."));
+      } else if (getApiErrorStatus(err) === 401) {
         window.location.href = `/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`;
       } else {
         setReviewError("Failed to submit review. Please try again.");
@@ -347,7 +341,7 @@ export default function ProductDetailPage() {
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   alt={product.name}
                   src={currentImage}
-                  onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/800x600/e4e2dd/414844?text=${encodeURIComponent(product.name)}`; } }}
+                  onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/800x600/e4e2dd/414844.png?text=${encodeURIComponent(product.name)}`; } }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -381,7 +375,7 @@ export default function ProductDetailPage() {
                       className="object-cover"
                       alt={`${product.name} view ${idx + 1}`}
                       src={img}
-                      onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/300x300/e4e2dd/414844?text=${encodeURIComponent(product.name)}`; } }}
+                      onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/300x300/e4e2dd/414844.png?text=${encodeURIComponent(product.name)}`; } }}
                     />
                   </button>
                 ))}
@@ -811,7 +805,7 @@ export default function ProductDetailPage() {
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
                           alt={rp.name}
                           src={rpImg}
-                          onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/400x500/e4e2dd/414844?text=${encodeURIComponent(rp.name)}`; } }}
+                          onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/400x500/e4e2dd/414844.png?text=${encodeURIComponent(rp.name)}`; } }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-surface-variant">

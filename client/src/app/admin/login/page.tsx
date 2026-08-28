@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage } from "@/lib/api";
 import { useAdminAuth } from "@/lib/admin-auth-context";
 import { useNotification } from "@/lib/notification-context";
 
@@ -61,7 +61,7 @@ export default function AdminLoginPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const hs = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setError(null);
@@ -71,9 +71,8 @@ export default function AdminLoginPage() {
       login(r.data.token, r.data.user);
       showSuccess("Welcome back, Admin! You've been signed in.");
       setTimeout(() => router.push("/admin/dashboard"), 800);
-    } catch (err: any) {
-      const status = err.response?.status;
-      const msg = err.response?.data?.message || "Login failed. Please try again.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Login failed. Please try again.");
       setError(msg);
       showError(msg);
       triggerShake();
@@ -147,7 +146,7 @@ export default function AdminLoginPage() {
 
           <form
             ref={formRef}
-            onSubmit={hs}
+            onSubmit={handleSubmit}
             className={`space-y-6 transition-all duration-300 ${shake ? "animate-shake" : ""}`}
             noValidate
           >

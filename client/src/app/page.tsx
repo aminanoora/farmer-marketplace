@@ -106,7 +106,7 @@ function getCategoryImage(cat: Category): string {
   if (slug && CATEGORY_IMAGE_MAP[slug]) return CATEGORY_IMAGE_MAP[slug];
   const name = cat.name?.toLowerCase();
   if (name && CATEGORY_IMAGE_MAP[name]) return CATEGORY_IMAGE_MAP[name];
-  return `https://placehold.co/400x400/e4e2dd/414844?text=${encodeURIComponent(
+  return `https://placehold.co/400x400/e4e2dd/414844.png?text=${encodeURIComponent(
     cat.name?.charAt(0) || "?"
   )}`;
 }
@@ -140,6 +140,9 @@ export default function HomePage() {
   const [searchMinPrice, setSearchMinPrice] = useState<string>("");
   const [searchMaxPrice, setSearchMaxPrice] = useState<string>("");
   const [searchPage, setSearchPage] = useState(1);
+
+  // Product grid filter state
+  const [productFilter, setProductFilter] = useState<"all" | "organic" | "newest">("all");
 
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -256,10 +259,13 @@ export default function HomePage() {
       const res = await homepageAPI.subscribeToNewsletter(newsletterEmail);
       setNewsletterStatus({ type: "success", message: res.data.message });
       setNewsletterEmail("");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const axiosMsg = err && typeof err === "object" && "response" in err
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined;
       setNewsletterStatus({
         type: "error",
-        message: err.response?.data?.message || "Something went wrong. Please try again.",
+        message: axiosMsg || "Something went wrong. Please try again.",
       });
     } finally {
       setSubscribing(false);
@@ -268,7 +274,12 @@ export default function HomePage() {
 
   const categories = data?.categories || FALLBACK_CATEGORIES;
   const farmers = data?.featuredFarmers || [];
-  const products = data?.recentProducts || [];
+  const allProducts = data?.recentProducts || [];
+  const products = productFilter === "organic"
+    ? allProducts.filter((p) => p.isOrganic)
+    : productFilter === "newest"
+    ? [...allProducts].sort((a, b) => new Date(b._id).getTime() - new Date(a._id).getTime())
+    : allProducts;
 
   return (
     <div className="min-h-screen bg-surface-container-lowest">
@@ -450,7 +461,7 @@ export default function HomePage() {
                                         className="object-cover"
                                         src={
                                           p.images?.[0] ||
-                                          `https://placehold.co/100x100/e4e2dd/414844?text=${encodeURIComponent(
+                                          `https://placehold.co/100x100/e4e2dd/414844.png?text=${encodeURIComponent(
                                             p.name.charAt(0)
                                           )}`
                                         }
@@ -504,7 +515,7 @@ export default function HomePage() {
                                         className="object-cover"
                                         src={
                                           f.avatar ||
-                                          `https://placehold.co/100x100/e4e2dd/414844?text=${encodeURIComponent(
+                                          `https://placehold.co/100x100/e4e2dd/414844.png?text=${encodeURIComponent(
                                             f.name.charAt(0)
                                           )}`
                                         }
@@ -577,15 +588,15 @@ export default function HomePage() {
               )}
             </div>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <span className="px-4 py-2 bg-surface-container-low/90 text-primary font-label-md rounded-full shadow-sm">
+              <button onClick={() => { setSearchQuery("Mangoes"); handleSearch(); }} className="px-4 py-2 bg-surface-container-low/90 text-primary font-label-md rounded-full shadow-sm hover:bg-surface-container-high transition-colors">
                 Popular: Seasonal Mangoes
-              </span>
-              <span className="px-4 py-2 bg-surface-container-low/90 text-primary font-label-md rounded-full shadow-sm">
+              </button>
+              <button onClick={() => { setSearchQuery("Spinach"); handleSearch(); }} className="px-4 py-2 bg-surface-container-low/90 text-primary font-label-md rounded-full shadow-sm hover:bg-surface-container-high transition-colors">
                 Fresh Spinach
-              </span>
-              <span className="px-4 py-2 bg-surface-container-low/90 text-primary font-label-md rounded-full shadow-sm">
+              </button>
+              <button onClick={() => { setSearchQuery("Honey"); handleSearch(); }} className="px-4 py-2 bg-surface-container-low/90 text-primary font-label-md rounded-full shadow-sm hover:bg-surface-container-high transition-colors">
                 Local Honey
-              </span>
+              </button>
             </div>
           </div>
         </section>
@@ -606,6 +617,7 @@ export default function HomePage() {
                 key={cat._id}
                 title={cat.name}
                 src={getCategoryImage(cat)}
+                slug={cat.slug}
               />
             ))}
           </div>
@@ -634,7 +646,7 @@ export default function HomePage() {
                       name={farmer.name}
                       farm={farmer.farmName || `${farmer.farmLocation?.village || ""} Farm`}
                       badges={badges}
-                      avatar={farmer.avatar || `https://placehold.co/200x200/e4e2dd/414844?text=${farmer.name.charAt(0)}`}
+                      avatar={farmer.avatar || `https://placehold.co/200x200/e4e2dd/414844.png?text=${farmer.name.charAt(0)}`}
                     />
                   );
                 })}
@@ -670,17 +682,14 @@ export default function HomePage() {
               Fresh Harvest Today
             </h3>
             <div className="flex gap-3 overflow-x-auto pb-2 md:pb-0">
-              <button className="px-6 py-2 bg-primary text-on-primary rounded-full font-label-md whitespace-nowrap">
+              <button onClick={() => setProductFilter("all")} className={`px-6 py-2 rounded-full font-label-md whitespace-nowrap transition-colors ${productFilter === "all" ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"}`}>
                 All Produce
               </button>
-              <button className="px-6 py-2 bg-surface-container-high text-on-surface-variant rounded-full font-label-md hover:bg-surface-variant transition-colors whitespace-nowrap">
+              <button onClick={() => setProductFilter("organic")} className={`px-6 py-2 rounded-full font-label-md whitespace-nowrap transition-colors ${productFilter === "organic" ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"}`}>
                 Organic Only
               </button>
-              <button className="px-6 py-2 bg-surface-container-high text-on-surface-variant rounded-full font-label-md hover:bg-surface-variant transition-colors whitespace-nowrap">
+              <button onClick={() => setProductFilter("newest")} className={`px-6 py-2 rounded-full font-label-md whitespace-nowrap transition-colors ${productFilter === "newest" ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"}`}>
                 Newly Added
-              </button>
-              <button className="px-6 py-2 bg-surface-container-high text-on-surface-variant rounded-full font-label-md hover:bg-surface-variant transition-colors whitespace-nowrap">
-                Nearby
               </button>
             </div>
           </div>
@@ -722,7 +731,7 @@ export default function HomePage() {
                       inStock={product.isAvailable}
                       src={
                         product.images?.[0] ||
-                        `https://placehold.co/600x450/e4e2dd/414844?text=${encodeURIComponent(product.name)}`
+                        `https://placehold.co/600x450/e4e2dd/414844.png?text=${encodeURIComponent(product.name)}`
                       }
                       onToggleFavorite={() => toggleItem({
                         productId: product._id,
@@ -890,33 +899,33 @@ export default function HomePage() {
           <div>
             <h5 className="font-label-md text-primary mb-4">Shop</h5>
             <ul className="space-y-2 text-on-surface-variant">
-              <li><a href="#" className="hover:text-primary">All Produce</a></li>
-              <li><a href="#" className="hover:text-primary">Monthly Box</a></li>
-              <li><a href="#" className="hover:text-primary">Gift Cards</a></li>
-              <li><a href="#" className="hover:text-primary">Offers</a></li>
+              <li><Link href="/marketplace" className="hover:text-primary">All Produce</Link></li>
+              <li><Link href="/marketplace?category=dairy" className="hover:text-primary">Monthly Box</Link></li>
+              <li><Link href="/wishlist" className="hover:text-primary">Gift Cards</Link></li>
+              <li><Link href="/marketplace" className="hover:text-primary">Offers</Link></li>
             </ul>
           </div>
           <div>
             <h5 className="font-label-md text-primary mb-4">About</h5>
             <ul className="space-y-2 text-on-surface-variant">
-              <li><a href="#" className="hover:text-primary">Our Story</a></li>
-              <li><a href="#" className="hover:text-primary">The Farmers</a></li>
-              <li><a href="#" className="hover:text-primary">Sustainability</a></li>
-              <li><a href="#" className="hover:text-primary">Careers</a></li>
+              <li><Link href="/" className="hover:text-primary">Our Story</Link></li>
+              <li><Link href="/farmers" className="hover:text-primary">The Farmers</Link></li>
+              <li><Link href="/marketplace?organic=true" className="hover:text-primary">Sustainability</Link></li>
+              <li><Link href="/" className="hover:text-primary">Careers</Link></li>
             </ul>
           </div>
           <div>
             <h5 className="font-label-md text-primary mb-4">Support</h5>
             <ul className="space-y-2 text-on-surface-variant">
-              <li><a href="#" className="hover:text-primary">Contact Us</a></li>
-              <li><a href="#" className="hover:text-primary">Delivery Info</a></li>
-              <li><a href="#" className="hover:text-primary">FAQ</a></li>
-              <li><a href="#" className="hover:text-primary">Privacy Policy</a></li>
+              <li><a href="mailto:support@krishimarket.in" className="hover:text-primary">Contact Us</a></li>
+              <li><Link href="/marketplace" className="hover:text-primary">Delivery Info</Link></li>
+              <li><Link href="/" className="hover:text-primary">FAQ</Link></li>
+              <li><Link href="/" className="hover:text-primary">Privacy Policy</Link></li>
             </ul>
           </div>
         </div>
         <div className="max-w-max-width mx-auto px-margin-desktop mt-12 pt-8 border-t border-outline-variant text-center text-on-surface-variant font-label-sm">
-          © 2024 Krishi Market. Supporting local agriculture.
+          © 2026 Krishi Market. Supporting local agriculture.
         </div>
       </footer>
     </div>
@@ -925,9 +934,9 @@ export default function HomePage() {
 
 /* ─── Reusable Components ───────────────────── */
 
-function CategoryCard({ title, src }: { title: string; src: string }) {
+function CategoryCard({ title, src, slug }: { title: string; src: string; slug?: string }) {
   return (
-    <div className="group cursor-pointer">
+    <Link href={`/marketplace?category=${encodeURIComponent(slug || title.toLowerCase())}`} className="group block">
       <div className="aspect-square rounded-2xl overflow-hidden mb-3 relative bg-surface-container">
         <Image
           fill
@@ -942,7 +951,7 @@ function CategoryCard({ title, src }: { title: string; src: string }) {
           </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -1061,7 +1070,7 @@ function ProductCard({
             className="object-cover transition-transform duration-700 group-hover:scale-110"
             alt={name}
             src={src}
-            onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/600x450/e4e2dd/414844?text=${encodeURIComponent(name)}`; } }}
+            onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/600x450/e4e2dd/414844.png?text=${encodeURIComponent(name)}`; } }}
           />
           {organic && (
             <span className="absolute top-3 left-3 px-3 py-1 bg-primary text-on-primary text-[10px] font-bold rounded-full uppercase tracking-widest flex items-center gap-1">

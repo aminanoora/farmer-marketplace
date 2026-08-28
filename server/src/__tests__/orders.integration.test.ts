@@ -430,12 +430,12 @@ describe("GET /api/orders/payment-methods/summary", () => {
     await request(app)
       .post("/api/orders")
       .set("Authorization", `Bearer ${consumerToken}`)
-      .send(orderPayload())
+      .send(orderPayload({ items: [{ productId, quantity: 3 }] }))
       .expect(201);
     await request(app)
       .post("/api/orders")
       .set("Authorization", `Bearer ${consumerToken}`)
-      .send(orderPayload({ paymentMethod: "online" }))
+      .send(orderPayload({ paymentMethod: "online", items: [{ productId, quantity: 1 }] }))
       .expect(201);
 
     const res = await request(app)
@@ -449,9 +449,9 @@ describe("GET /api/orders/payment-methods/summary", () => {
     const online = res.body.methods.find((m: any) => m.method === "online");
     expect(cod).toBeDefined();
     expect(cod.count).toBe(2);
-    expect(cod.totalSpent).toBe(200);
+    expect(cod.totalSpent).toBe(250);
     expect(online).toBeDefined();
     expect(online.count).toBe(1);
-    expect(online.totalSpent).toBe(100);
+    expect(online.totalSpent).toBe(50);
   });
 });

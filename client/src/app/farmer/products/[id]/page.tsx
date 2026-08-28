@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { farmerAPI } from "@/lib/api";
+import { farmerAPI, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
+import { formatCurrency, formatDate, formatDateTime } from "@shared/utils";
 
 // ─────────────────────────────────────────────────
 // Types
@@ -41,32 +42,8 @@ interface ProductDetail {
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
-function formatCurrency(amount: number): string {
-  return "\u20B9" + amount.toLocaleString("en-IN", {
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
-}
 
-function formatDate(iso: string): string {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
 
-function formatDateTime(iso: string): string {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 // ─────────────────────────────────────────────────
 // Detail Row Component
@@ -109,10 +86,10 @@ export default function ProductDetailPage() {
         setIsAvailable(p.isAvailable);
       })
       .catch((err) => {
-        if (err.response?.status === 404) {
+        if (getApiErrorStatus(err) === 404) {
           setError("Product not found. It may have been deleted.");
         } else {
-          setError(err?.response?.data?.message || err?.message || "Failed to load product details.");
+          setError(getApiErrorMessage(err, "Failed to load product details."));
         }
       })
       .finally(() => setLoading(false));

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { validationResult } from "express-validator";
+import { validationResult, FieldValidationError } from "express-validator";
 
 /**
  * Middleware to check validation results from express-validator
@@ -15,7 +15,7 @@ export const validate = (
       success: false,
       message: "Validation failed",
       errors: errors.array().map((err) => ({
-        field: (err as any).path,
+        field: "path" in err ? (err as FieldValidationError).path : undefined,
         message: err.msg,
       })),
     });

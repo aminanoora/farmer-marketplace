@@ -33,10 +33,28 @@ vi.mock("@/lib/notification-context", () => ({
   }),
 }));
 
+const mockGetApiErrorMessage = vi.hoisted(() =>
+  vi.fn((err: unknown, fallback: string) => {
+    if (err instanceof AxiosError) {
+      return err.response?.data?.message || err.message || fallback;
+    }
+    if (err instanceof Error) return err.message;
+    return fallback;
+  })
+);
+const mockGetApiErrorStatus = vi.hoisted(() =>
+  vi.fn((err: unknown) => {
+    if (err instanceof AxiosError) return err.response?.status;
+    return undefined;
+  })
+);
+
 vi.mock("@/lib/api", () => ({
   authAPI: {
     login: mockAuthLogin,
   },
+  getApiErrorMessage: mockGetApiErrorMessage,
+  getApiErrorStatus: mockGetApiErrorStatus,
 }));
 
 vi.mock("@/components/forgot-password-modal", () => ({

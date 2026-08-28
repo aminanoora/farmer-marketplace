@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { authAPI } from "@/lib/api";
+import { authAPI, getApiErrorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
 import ForgotPasswordModal from "@/components/forgot-password-modal";
@@ -64,7 +64,7 @@ export default function LoginPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const hs = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setError(null);
@@ -74,8 +74,8 @@ export default function LoginPage() {
       login(r.data.token, r.data.user);
       showSuccess("Welcome back! You've been signed in successfully.");
       setTimeout(() => router.push("/"), 800);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || "Login failed. Please try again.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Login failed. Please try again.");
       setError(msg);
       showError(msg);
       triggerShake();
@@ -132,7 +132,7 @@ export default function LoginPage() {
 
           <form
             ref={formRef}
-            onSubmit={hs}
+            onSubmit={handleSubmit}
             className={`space-y-6 transition-all duration-300 ${shake ? "animate-shake" : ""}`}
             noValidate
           >

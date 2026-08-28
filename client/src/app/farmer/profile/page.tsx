@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { farmerAPI } from "@/lib/api";
+import { farmerAPI, getApiErrorMessage } from "@/lib/api";
 
 interface BankDetails {
   accountHolderName?: string;
@@ -179,7 +179,7 @@ export default function FarmerProfilePage() {
         setPlatformNews(p.notificationSettings?.platformNews ?? false);
       })
       .catch((err) => {
-        setError(err?.response?.data?.message || err?.message || "Failed to load profile.");
+        setError(getApiErrorMessage(err, "Failed to load profile."));
       })
       .finally(() => setLoading(false));
   }, [isAuthenticated, user]);

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
-import { farmerAPI } from "@/lib/api";
+import { farmerAPI, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency, formatDate, formatTime, getOrderIdDisplay } from "@shared/utils";
 
 // ─────────────────────────────────────────────────
 // Types
@@ -77,30 +78,8 @@ function getStatusStyle(status: string) {
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
-function formatCurrency(amount: number): string {
-  return "₹" + amount.toLocaleString("en-IN");
-}
 
-function formatDate(iso: string): string {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
-function formatTime(iso: string): string {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function getOrderIdDisplay(id: string): string {
-  return "#KM-" + id.slice(-5).toUpperCase();
-}
 
 function getItemsSummary(items: OrderItem[]): string {
   return items.map((i) => `${i.name} (${i.quantity} ${i.unit})`).join(", ");
@@ -210,7 +189,7 @@ export default function FarmerOrdersPage() {
         setStatusSelect(initial);
       })
       .catch((err) => {
-        const msg = err?.response?.data?.message || err?.message || "Failed to load orders.";
+        const msg = getApiErrorMessage(err, "Failed to load orders.");
         setError(msg);
         showError(msg);
       })
@@ -251,8 +230,8 @@ export default function FarmerOrdersPage() {
       );
       setStatusSelect((prev) => ({ ...prev, [orderId]: newStatus }));
       showSuccess(`Order ${getOrderIdDisplay(orderId)} marked as "${getStatusStyle(newStatus).label}".`);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Failed to update order status.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to update order status.");
       showError(msg);
       setError(msg);
       // Roll back the staged select value on failure

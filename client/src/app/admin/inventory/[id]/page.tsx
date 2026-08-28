@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
+import { formatCurrency, formatDate, formatDateTime, getInitials } from "@shared/utils";
 
 /* ─── Types ────────────────────────────────── */
 
@@ -40,26 +41,8 @@ const APPROVAL_BADGES: Record<string, { label: string; bg: string; text: string;
   rejected: { label: "Rejected", bg: "bg-error-container", text: "text-on-error-container", icon: "cancel" },
 };
 
-function formatDate(iso: string) {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function formatDateTime(iso: string) {
-  if (!iso) return "---";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + " at " +
-    d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-}
 
-function formatCurrency(amount: number) {
-  return "₹" + amount.toLocaleString("en-IN");
-}
-
-function getInitials(name: string) {
-  if (!name) return "?";
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-}
 
 function InfoRow({ icon, label, value }: { icon: string; label: string; value: React.ReactNode }) {
   return (
@@ -103,8 +86,8 @@ export default function AdminInventoryProductDetailPage() {
     adminAPI.getProduct(id)
       .then((res) => setData(res.data))
       .catch((err) => {
-        if (err?.response?.status === 404) setError("Product not found. It may have been deleted or the link is incorrect.");
-        else setError(err?.response?.data?.message || err?.message || "Failed to load product.");
+        if (getApiErrorStatus(err) === 404) setError("Product not found. It may have been deleted or the link is incorrect.");
+        else setError(getApiErrorMessage(err, "Failed to load product."));
       })
       .finally(() => setLoading(false));
   }, [isAuthenticated, id, user?.role]);
@@ -128,8 +111,8 @@ export default function AdminInventoryProductDetailPage() {
       setData({ ...data, product: { ...data.product, isAvailable: res.data.product.isAvailable, approvalStatus: res.data.product.approvalStatus } });
       showSuccess(res.data.message);
       setConfirmAction(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to update product.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to update product."));
     } finally { setStatusUpdating(false); }
   };
 
@@ -141,8 +124,8 @@ export default function AdminInventoryProductDetailPage() {
       setData({ ...data, product: { ...data.product, approvalStatus: res.data.product.approvalStatus, isAvailable: res.data.product.isAvailable } });
       showSuccess(res.data.message);
       setConfirmAction(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to approve product.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to approve product."));
     } finally { setStatusUpdating(false); }
   };
 
@@ -154,8 +137,8 @@ export default function AdminInventoryProductDetailPage() {
       setData({ ...data, product: { ...data.product, approvalStatus: res.data.product.approvalStatus, isAvailable: res.data.product.isAvailable } });
       showSuccess(res.data.message);
       setConfirmAction(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to reject product.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to reject product."));
     } finally { setStatusUpdating(false); }
   };
 

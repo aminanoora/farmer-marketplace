@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { farmerAPI, consumerAPI } from "@/lib/api";
+import { farmerAPI, consumerAPI, getApiErrorMessage } from "@/lib/api";
 import { useNotification } from "@/lib/notification-context";
+import { formatCurrency } from "@shared/utils";
 
 // ─────────────────────────────────────────────────
 // Types
@@ -64,12 +65,6 @@ const UNITS = [
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
-function formatCurrency(amount: number): string {
-  return "₹" + amount.toLocaleString("en-IN", {
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 // ─────────────────────────────────────────────────
 // Form Field Components
@@ -226,8 +221,8 @@ export default function EditProductPage() {
           isFeatured: p.isFeatured || false,
           seoDescription: p.seoDescription || "",
         });
-      } catch (err: any) {
-        setSubmitError(err?.response?.data?.message || err?.message || "Failed to load product.");
+      } catch (err: unknown) {
+        setSubmitError(getApiErrorMessage(err, "Failed to load product."));
       } finally {
         setLoadingProduct(false);
         setLoadingCategories(false);
@@ -353,8 +348,8 @@ export default function EditProductPage() {
       await farmerAPI.updateProductWithImages(productId, formData);
       showSuccess("Product updated successfully! 🎉");
       router.push("/farmer/products");
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || "Failed to update product.";
+    } catch (err: unknown) {
+      const message = getApiErrorMessage(err, "Failed to update product.");
       showErrorToast(message);
       setSubmitError(message);
     } finally {

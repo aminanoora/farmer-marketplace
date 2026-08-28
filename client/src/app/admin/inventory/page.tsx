@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency, formatDate } from "@shared/utils";
 
 /* ─── Types ────────────────────────────────── */
 
@@ -35,14 +36,6 @@ const SORT_OPTIONS = [
   { value: "-name", label: "Name Z-A" },
 ] as const;
 
-function formatDate(iso: string) {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function formatCurrency(amount: number) {
-  return "\u20B9" + amount.toLocaleString("en-IN");
-}
 
 export default function AdminInventoryPage() {
   const router = useRouter();
@@ -99,7 +92,7 @@ export default function AdminInventoryPage() {
     if (sendSearch.trim()) params.search = sendSearch.trim();
     adminAPI.getProducts(params)
       .then((res) => { if (id === fetchIdRef.current) setData(res.data); })
-      .catch((err) => { if (id === fetchIdRef.current) setError(err?.response?.data?.message || err?.message || "Failed to load products."); })
+      .catch((err) => { if (id === fetchIdRef.current) setError(getApiErrorMessage(err, "Failed to load products.")); })
       .finally(() => { if (id === fetchIdRef.current) setLoading(false); });
   }, [isAuthenticated, user?.role, page, sortBy, statusFilter, catFilter, sendSearch]);
 
@@ -129,8 +122,8 @@ export default function AdminInventoryPage() {
       }
       showSuccess(res.data.message);
       setConfirmProductId(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to update product.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to update product."));
     } finally { setStatusUpdating(null); }
   };
 
@@ -230,6 +223,9 @@ export default function AdminInventoryPage() {
             </Link>
             <Link href="/admin/orders" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
               <span className="material-symbols-outlined">shopping_cart</span><span className="font-label-md">Orders</span>
+            </Link>
+            <Link href="/admin/deliveries" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
+              <span className="material-symbols-outlined">local_shipping</span><span className="font-label-md">Deliveries</span>
             </Link>
             <Link href="/admin/farmers" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
               <span className="material-symbols-outlined">group</span><span className="font-label-md">Users</span>

@@ -1,4 +1,24 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+
+/**
+ * Safely extract an error message from an Axios or unknown error.
+ * Use in catch blocks to avoid `any` casts.
+ */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof AxiosError) {
+    return err.response?.data?.message || err.message || fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
+/**
+ * Safely extract the HTTP status code from an Axios or unknown error.
+ */
+export function getApiErrorStatus(err: unknown): number | undefined {
+  if (err instanceof AxiosError) return err.response?.status;
+  return undefined;
+}
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
@@ -24,13 +44,28 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 responses globally
+// Handle 401 and 503 responses globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      const config = error.config;
-      const isAdminRoute = config?.url?.startsWith("/admin/");
+    const status = error.response?.status;
+    const config = error.config;
+    const url: string = config?.url || "";
+
+    // 503 Maintenance Mode — redirect to maintenance page
+    // Skip for admin routes (admins need access to disable maintenance)
+    // and auth routes (so the maintenance page can still load)
+    if (status === 503) {
+      const isAdminRoute = url.startsWith("/admin/");
+      const isMaintenancePage = typeof window !== "undefined" && window.location.pathname === "/maintenance";
+      if (!isAdminRoute && !isMaintenancePage && typeof window !== "undefined") {
+        window.location.href = "/maintenance";
+      }
+    }
+
+    // 401 Unauthorized
+    if (status === 401) {
+      const isAdminRoute = url.startsWith("/admin/");
       if (isAdminRoute) {
         localStorage.removeItem("krishi_admin_token");
         window.location.href = "/admin/login";
@@ -39,6 +74,7 @@ api.interceptors.response.use(
         window.location.href = "/auth/login";
       }
     }
+
     return Promise.reject(error);
   }
 );
@@ -83,19 +119,23 @@ export const authAPI = {
     api.post("/auth/forgot-password", { email }),
   resetPassword: (token: string, password: string) =>
     api.post(`/auth/reset-password/${token}`, { password }),
+  updateProfile: (data: { name?: string; phone?: string }) =>
+    api.put("/auth/profile", data),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.put("/auth/password", data),
 };
 
 /* ─── Farmer API ──────────────────────────────── */
 export const farmerAPI = {
   getProfile: () => api.get("/farmers/me"),
-  updateProfile: (data: any) => api.put("/farmers/me", data),
-  getProducts: (params?: any) => api.get("/farmers/products", { params }),
+  updateProfile: (data: Record<string, unknown>) => api.put("/farmers/me", data),
+  getProducts: (params?: Record<string, string | number>) => api.get("/farmers/products", { params }),
   getProduct: (id: string) => api.get(`/farmers/products/${id}`),
-  addProduct: (data: any) => api.post("/farmers/products", data),
+  addProduct: (data: Record<string, unknown>) => api.post("/farmers/products", data),
   addProductWithImages: (formData: FormData) =>
     // Axios auto-detects FormData and sets Content-Type with boundary
     api.post("/farmers/products", formData),
-  updateProduct: (id: string, data: any) =>
+  updateProduct: (id: string, data: Record<string, unknown>) =>
     api.put(`/farmers/products/${id}`, data),
   updateProductWithImages: (id: string, formData: FormData) =>
     api.put(`/farmers/products/${id}`, formData),
@@ -104,6 +144,10 @@ export const farmerAPI = {
   getOrder: (id: string) => api.get(`/farmers/orders/${id}`),
   updateOrderStatus: (id: string, status: string) =>
     api.patch(`/farmers/orders/${id}`, { status }),
+  confirmOrder: (id: string) =>
+    api.patch(`/farmers/orders/${id}/confirm`),
+  cancelOrder: (id: string) =>
+    api.patch(`/farmers/orders/${id}/cancel`),
   getEarnings: () => api.get("/farmers/earnings"),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     api.post("/farmers/change-password", data),
@@ -111,18 +155,19 @@ export const farmerAPI = {
 
 /* ─── Consumer API ────────────────────────────── */
 export const consumerAPI = {
-  getProducts: (params?: any) => api.get("/products", { params }),
+  getProducts: (params?: Record<string, string | number>) => api.get("/products", { params }),
   getProduct: (id: string) => api.get(`/products/${id}`),
-  getFarmers: (params?: any) => api.get("/farmers", { params }),
+  getFarmers: (params?: Record<string, string | number>) => api.get("/farmers", { params }),
   getFarmer: (id: string) => api.get(`/farmers/${id}`),
-  placeOrder: (data: any) => api.post("/orders", data),
+  placeOrder: (data: Record<string, unknown>) => api.post("/orders", data),
   getOrders: () => api.get("/orders"),
   getOrder: (id: string) => api.get(`/orders/${id}`),
   cancelOrder: (id: string) => api.patch(`/orders/${id}/cancel`),
   getReviews: (params?: { product?: string; farmer?: string }) =>
     api.get("/reviews", { params }),
-  addReview: (data: any) => api.post("/reviews", data),
+  addReview: (data: Record<string, unknown>) => api.post("/reviews", data),
   getCategories: () => api.get("/categories"),
+  getOrderDelivery: (orderId: string) => api.get(`/deliveries/order/${orderId}`),
 };
 
 /* ─── Payment Methods API ──────────────────────── */
@@ -162,25 +207,28 @@ export const adminAPI = {
   getMe: () => api.get("/admin/me"),
   getDashboard: () => api.get("/admin/dashboard"),
   getDashboardOverview: () => api.get("/admin/dashboard/overview"),
-  getFarmers: (params?: any) => api.get("/admin/farmers", { params }),
+  getDashboardTransactions: () => api.get("/admin/dashboard/transactions"),
+  getFarmers: (params?: Record<string, string | number>) => api.get("/admin/farmers", { params }),
   approveFarmer: (id: string) => api.patch(`/admin/farmers/${id}/approve`),
   rejectFarmer: (id: string) => api.patch(`/admin/farmers/${id}/reject`),
   getCategories: () => api.get("/admin/categories"),
-  createCategory: (data: any) => api.post("/admin/categories", data),
-  updateCategory: (id: string, data: any) =>
+  createCategory: (data: Record<string, unknown>) => api.post("/admin/categories", data),
+  updateCategory: (id: string, data: Record<string, unknown>) =>
     api.put(`/admin/categories/${id}`, data),
   deleteCategory: (id: string) => api.delete(`/admin/categories/${id}`),
-  getOrders: (params?: any) => api.get("/admin/orders", { params }),
+  getOrders: (params?: Record<string, string | number>) => api.get("/admin/orders", { params }),
   getOrder: (id: string) => api.get("/admin/orders/" + id),
   updateOrderStatus: (id: string, status: string) =>
     api.patch("/admin/orders/" + id + "/status", { status }),
   updateOrderDetails: (id: string, data: { trackingId?: string; notes?: string }) =>
     api.patch("/admin/orders/" + id + "/details", data),
   getAnalytics: () => api.get("/admin/analytics"),
+  getSettings: () => api.get("/admin/settings"),
+  updateSettings: (data: Record<string, unknown>) => api.patch("/admin/settings", data),
   getUser: (id: string) => api.get("/admin/farmers/" + id),
   toggleUserStatus: (id: string, isActive: boolean) =>
     api.patch("/admin/farmers/" + id + "/status", { isActive }),
-  getProducts: (params?: any) => api.get("/admin/products", { params }),
+  getProducts: (params?: Record<string, string | number>) => api.get("/admin/products", { params }),
   getProduct: (id: string) => api.get("/admin/products/" + id),
   toggleProductStatus: (id: string, isAvailable: boolean) =>
     api.patch("/admin/products/" + id + "/status", { isAvailable }),
@@ -188,4 +236,14 @@ export const adminAPI = {
     api.patch("/admin/products/" + id + "/approve"),
   rejectProduct: (id: string) =>
     api.patch("/admin/products/" + id + "/reject"),
+
+  // ─── Delivery Management ──────────────────
+  getDeliveries: (params?: Record<string, string | number>) => api.get("/deliveries", { params }),
+  getDelivery: (id: string) => api.get("/deliveries/" + id),
+  createDelivery: (data: Record<string, unknown>) => api.post("/deliveries", data),
+  updateDeliveryStatus: (id: string, status: string, trackingNotes?: string) =>
+    api.patch("/deliveries/" + id + "/status", { status, trackingNotes }),
+  updateDeliveryDetails: (id: string, data: Record<string, unknown>) =>
+    api.patch("/deliveries/" + id + "/details", data),
+  deleteDelivery: (id: string) => api.delete("/deliveries/" + id),
 };

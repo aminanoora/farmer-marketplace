@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useParams } from "next/navigation";
-import { authAPI } from "@/lib/api";
+import { authAPI, getApiErrorMessage } from "@/lib/api";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -26,8 +26,8 @@ export default function ResetPasswordPage() {
     try {
       await authAPI.resetPassword(token, password);
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Reset failed. The link may have expired.");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Reset failed. The link may have expired."));
     } finally { setLoading(false); }
   };
 

@@ -5,13 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { farmerAPI } from "@/lib/api";
+import { formatCurrency, formatDate, getOrderIdDisplay } from "@shared/utils";
 
 // ─────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────
+interface DashboardOrder {
+  _id: string;
+  status: string;
+  totalAmount: number;
+  createdAt: string;
+  consumer?: { name: string };
+}
+
+interface DashboardProduct {
+  _id: string;
+  isAvailable: boolean;
+  quantity: number;
+  approvalStatus: string;
+}
+
 interface DashboardData {
   products: { total: number; active: number; lowStock: number; outOfStock: number; pending: number };
-  orders: { total: number; pending: number; recent: any[] };
+  orders: { total: number; pending: number; recent: DashboardOrder[] };
   earnings: { total: number; totalOrders: number };
   farmerName: string;
   farmName: string;
@@ -21,22 +37,7 @@ interface DashboardData {
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
-function formatCurrency(amount: number): string {
-  return "\u20B9" + amount.toLocaleString("en-IN");
-}
 
-function formatDate(iso: string): string {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function getOrderIdDisplay(id: string): string {
-  return "#KM-" + id.slice(-5).toUpperCase();
-}
 
 const STATUS_STYLES: Record<string, { label: string; bg: string; text: string }> = {
   delivered:            { label: "Delivered",        bg: "bg-primary-fixed",      text: "text-on-primary-fixed-variant" },
@@ -139,14 +140,14 @@ export default function FarmerDashboardPage() {
         const orders = ordersRes.data.orders || [];
         const earnings = earningsRes.data;
 
-        const activeProducts = products.filter((p: any) => p.isAvailable);
+        const activeProducts = products.filter((p: DashboardProduct) => p.isAvailable);
         const lowStockProducts = products.filter(
-          (p: any) => p.isAvailable && p.quantity < 20 && p.quantity > 0
+          (p: DashboardProduct) => p.isAvailable && p.quantity < 20 && p.quantity > 0
         );
-        const outOfStockProducts = products.filter((p: any) => !p.isAvailable);
-        const pendingProducts = products.filter((p: any) => p.approvalStatus === "pending");
+        const outOfStockProducts = products.filter((p: DashboardProduct) => !p.isAvailable);
+        const pendingProducts = products.filter((p: DashboardProduct) => p.approvalStatus === "pending");
         const pendingOrders = orders.filter(
-          (o: any) => o.status === "pending" || o.status === "confirmed"
+          (o: DashboardOrder) => o.status === "pending" || o.status === "confirmed"
         );
         const recentOrders = orders.slice(0, 5);
 
@@ -400,7 +401,7 @@ export default function FarmerDashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant">
-                    {s.orders.recent.map((order: any) => {
+                    {s.orders.recent.map((order: DashboardOrder) => {
                       const ss = getStatusStyle(order.status);
                       return (
                         <tr

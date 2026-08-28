@@ -6,7 +6,8 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
 import { useCart } from "@/lib/cart-context";
-import { consumerAPI } from "@/lib/api";
+import { consumerAPI, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
+import { formatCurrency, formatDate, formatTime, getOrderIdDisplay } from "@shared/utils";
 
 /* ─── Types ──────────────────────────────────── */
 
@@ -74,28 +75,8 @@ function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] || STATUS_CONFIG.pending;
 }
 
-function formatDate(iso: string) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
-function formatTime(iso: string) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
-function getOrderIdDisplay(id: string) {
-  return `#KM-${id.slice(-5).toUpperCase()}`;
-}
 
 /* ─── Component ──────────────────────────────── */
 
@@ -160,8 +141,8 @@ export default function OrderDetailPage() {
       setReviewRating(0);
       setReviewComment("");
       showSuccess(`Review submitted for ${reviewTarget.name}.`);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Failed to submit review.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to submit review.");
       setReviewError(msg);
       // If already reviewed (e.g. after page refresh), update local state and close modal
       if (msg.toLowerCase().includes("already reviewed")) {
@@ -185,8 +166,8 @@ export default function OrderDetailPage() {
       setOrder(res.data.order);
       setShowCancelDialog(false);
       showSuccess("Order has been cancelled successfully.");
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Failed to cancel order.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to cancel order.");
       setCancelError(msg); // Displayed inside the open dialog
     } finally {
       setCancelling(false);
@@ -205,12 +186,12 @@ export default function OrderDetailPage() {
         previousStatusRef.current = res.data.order.status;
       })
       .catch((err) => {
-        if (err?.response?.status === 404) {
+        if (getApiErrorStatus(err) === 404) {
           setError("Order not found. It may have been removed or the link is incorrect.");
-        } else if (err?.response?.status === 403) {
+        } else if (getApiErrorStatus(err) === 403) {
           setError("You don't have permission to view this order.");
         } else {
-          setError(err?.response?.data?.message || err?.message || "Failed to load order details.");
+          setError(getApiErrorMessage(err, "Failed to load order details."));
         }
       })
       .finally(() => setLoading(false));
@@ -218,10 +199,11 @@ export default function OrderDetailPage() {
 
   // Poll for status updates every 20 seconds (stops on terminal statuses)
   useEffect(() => {
-    if (!isAuthenticated || !id || !order) return;
+    if (!isAuthenticated || !id) return;
 
+    const status = order?.status;
     // Terminal states — no need to poll
-    if (TERMINAL_STATUSES.includes(order.status)) {
+    if (!status || TERMINAL_STATUSES.includes(status)) {
       setPollingActive(false);
       return;
     }
@@ -259,7 +241,7 @@ export default function OrderDetailPage() {
       clearInterval(intervalId);
       setPollingActive(false);
     };
-  }, [isAuthenticated, id, order?.status]);
+  }, [isAuthenticated, id, order?.status, showSuccess]);
 
   // Loading
   if (authLoading || loading) {
@@ -500,7 +482,7 @@ export default function OrderDetailPage() {
             {/* Order summary stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-outline-variant bg-surface-container-low">
               <StatCell label="Items" value={`${order.items.length} product${order.items.length !== 1 ? "s" : ""}`} icon="inventory_2" />
-              <StatCell label="Total Amount" value={`₹${order.totalAmount.toLocaleString("en-IN")}`} icon="payments" />
+              <StatCell label="Total Amount" value={`${formatCurrency(order.totalAmount)}`} icon="payments" />
               <StatCell label="Payment" value={order.paymentMethod === "cod" ? "Cash on Delivery" : "Online"} icon={order.paymentMethod === "cod" ? "money" : "credit_card"} />
               <StatCell label="Payment Status" value={order.paymentStatus === "paid" ? "Paid" : order.paymentStatus === "pending" ? "Pending" : order.paymentStatus === "failed" ? "Failed" : "Refunded"} icon="account_balance" />
             </div>
@@ -535,7 +517,7 @@ export default function OrderDetailPage() {
                         </div>
                         <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                           <p className="font-bold text-primary">
-                            ₹{(item.price * item.quantity).toLocaleString("en-IN")}
+                            {formatCurrency(item.price * item.quantity)}
                           </p>
                           {order.status === "delivered" && (
                             alreadyReviewed ? (
@@ -567,7 +549,7 @@ export default function OrderDetailPage() {
                 <div className="flex justify-between items-center p-lg bg-surface-container-low border-t border-outline-variant">
                   <span className="font-label-md text-on-surface-variant uppercase tracking-wider">Order Total</span>
                   <span className="font-headline-md text-headline-md text-primary">
-                    ₹{order.totalAmount.toLocaleString("en-IN")}
+                    {formatCurrency(order.totalAmount)}
                   </span>
                 </div>
               </div>

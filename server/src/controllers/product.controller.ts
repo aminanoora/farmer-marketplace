@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Product from "../models/Product";
 import Review from "../models/Review";
+import { getErrorMessage } from "../utils/response";
 
 /**
  * Get all available products (public — for consumers)
@@ -11,6 +12,7 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
       category,
       farmer,
       isOrganic,
+      featured,
       minPrice,
       maxPrice,
       search,
@@ -18,7 +20,7 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
       limit = "20",
     } = req.query;
 
-    const filter: Record<string, any> = {
+    const filter: Record<string, unknown> = {
       isAvailable: true,
       // Only admin-approved products are visible on the public marketplace
       approvalStatus: "approved",
@@ -27,10 +29,9 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     if (category) filter.category = category;
     if (farmer) filter.farmer = farmer;
     if (isOrganic !== undefined) filter.isOrganic = isOrganic === "true";
+    if (featured !== undefined) filter.isFeatured = featured === "true";
     if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice);
-      if (maxPrice) filter.price.$lte = Number(maxPrice);
+      filter.price = { $gte: minPrice ? Number(minPrice) : undefined, $lte: maxPrice ? Number(maxPrice) : undefined };
     }
     if (search) {
       filter.$text = { $search: search as string };
@@ -64,8 +65,8 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
         pages: Math.ceil(total / limitNum),
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -127,7 +128,7 @@ export const getProduct = async (req: Request, res: Response): Promise<void> => 
       ratingDistribution,
       relatedProducts,
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };

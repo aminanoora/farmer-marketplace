@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency, formatDate, formatDateTime } from "@shared/utils";
 
 /* ─── Types ────────────────────────────────── */
 
@@ -47,19 +48,7 @@ const APPROVAL_BADGES: Record<string, { label: string; bg: string; text: string;
   rejected: { label: "Rejected", bg: "bg-red-50",    text: "text-red-700",  icon: "cancel" },
 };
 
-function formatDate(iso: string) {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function formatDateTime(iso: string) {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
-function formatCurrency(amount: number) {
-  return "\u20B9" + amount.toLocaleString("en-IN");
-}
 
 function getTimeAgo(iso: string) {
   if (!iso) return "";
@@ -143,7 +132,7 @@ export default function AdminProductApprovalsPage() {
     if (sendSearch.trim()) params.search = sendSearch.trim();
     adminAPI.getProducts(params)
       .then((res) => { if (id === fetchIdRef.current) setData(res.data); })
-      .catch((err) => { if (id === fetchIdRef.current) setError(err?.response?.data?.message || err?.message || "Failed to load products."); })
+      .catch((err) => { if (id === fetchIdRef.current) setError(getApiErrorMessage(err, "Failed to load products.")); })
       .finally(() => { if (id === fetchIdRef.current) setLoading(false); });
   }, [isAuthenticated, user?.role, page, sortBy, statusTab, catFilter, sendSearch]);
 
@@ -161,8 +150,8 @@ export default function AdminProductApprovalsPage() {
         setData({ ...data, products: updated });
       }
       setConfirmAction(null);
-    } catch (err: any) {
-      setToastError(err?.response?.data?.message || "Failed to approve product.");
+    } catch (err: unknown) {
+      setToastError(getApiErrorMessage(err, "Failed to approve product."));
     } finally { setActionUpdating(null); }
   };
 
@@ -178,8 +167,8 @@ export default function AdminProductApprovalsPage() {
         setData({ ...data, products: updated });
       }
       setConfirmAction(null);
-    } catch (err: any) {
-      setToastError(err?.response?.data?.message || "Failed to reject product.");
+    } catch (err: unknown) {
+      setToastError(getApiErrorMessage(err, "Failed to reject product."));
     } finally { setActionUpdating(null); }
   };
 

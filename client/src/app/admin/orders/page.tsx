@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency, formatDate, getInitials, getOrderIdDisplay } from "@shared/utils";
 
 /* ─── Types ────────────────────────────────── */
 
@@ -46,23 +47,8 @@ function getStatusStyle(status: string) {
   return STATUS_STYLES[status] || STATUS_STYLES.pending;
 }
 
-function formatDate(iso: string) {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function formatCurrency(amount: number) {
-  return "\u20B9" + amount.toLocaleString("en-IN");
-}
 
-function getOrderIdDisplay(id: string) {
-  return "#ORD-" + id.slice(-5).toUpperCase();
-}
-
-function getInitials(name: string) {
-  if (!name) return "??";
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-}
 
 function getInitialsBg(name: string) {
   const colors = [
@@ -124,7 +110,7 @@ export default function AdminOrdersPage() {
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [sendSearch, statusFilter, dateFilter]);
 
-  const buildDateParams = () => {
+  const buildDateParams = useCallback(() => {
     const now = new Date();
     switch (dateFilter) {
       case "last30":
@@ -136,7 +122,7 @@ export default function AdminOrdersPage() {
       default:
         return {};
     }
-  };
+  }, [dateFilter]);
 
   const fetchOrders = useCallback(() => {
     if (!isAuthenticated || user?.role !== "admin") return;
@@ -154,9 +140,9 @@ export default function AdminOrdersPage() {
     if (sendSearch.trim()) params.search = sendSearch.trim();
     adminAPI.getOrders(params)
       .then((res) => { if (id === fetchIdRef.current) setData(res.data); })
-      .catch((err) => { if (id === fetchIdRef.current) setError(err?.response?.data?.message || err?.message || "Failed to load orders."); })
+      .catch((err) => { if (id === fetchIdRef.current) setError(getApiErrorMessage(err, "Failed to load orders.")); })
       .finally(() => { if (id === fetchIdRef.current) setLoading(false); });
-  }, [isAuthenticated, user?.role, page, sortBy, statusFilter, sendSearch]);
+  }, [isAuthenticated, user?.role, page, sortBy, statusFilter, sendSearch, buildDateParams]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -253,6 +239,9 @@ export default function AdminOrdersPage() {
             </Link>
             <Link href="/admin/orders" className="flex items-center gap-md px-md py-sm rounded-lg bg-primary-container text-on-primary">
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>shopping_cart</span><span className="font-label-md">Orders</span>
+            </Link>
+            <Link href="/admin/deliveries" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
+              <span className="material-symbols-outlined">local_shipping</span><span className="font-label-md">Deliveries</span>
             </Link>
             <Link href="/admin/farmers" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
               <span className="material-symbols-outlined">group</span><span className="font-label-md">Users</span>
@@ -415,7 +404,7 @@ export default function AdminOrdersPage() {
                       const initialsClass = getInitialsBg(order.consumer?.name || "");
                       return (
                         <tr key={order._id} className="hover:bg-surface-container transition-colors group cursor-pointer" onClick={() => router.push("/admin/orders/" + order._id)}>
-                          <td className="px-lg py-4 font-label-md text-primary">{getOrderIdDisplay(order._id)}</td>
+                          <td className="px-lg py-4 font-label-md text-primary">{getOrderIdDisplay(order._id, "ORD")}</td>
                           <td className="px-lg py-4 text-on-surface-variant">{formatDate(order.createdAt)}</td>
                           <td className="px-lg py-4">
                             <div className="flex items-center gap-3">

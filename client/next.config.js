@@ -18,9 +18,13 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, ".."),
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "**" },
-      // Dev-only safety net: legacy local image URLs (http://localhost:5000/...)
-      // from pre-Blob data stay optimizable locally (https is covered above).
+      // Static brand/hero images
+      { protocol: "https", hostname: "images.unsplash.com" },
+      // Fallback placeholder images
+      { protocol: "https", hostname: "placehold.co" },
+      // Vercel Blob storage (product images)
+      { protocol: "https", hostname: "*.vercel-storage.com" },
+      // Dev-only: legacy local image URLs (http://localhost:5000/...)
       { protocol: "http", hostname: "localhost" },
       { protocol: "http", hostname: "127.0.0.1" },
     ],

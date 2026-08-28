@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
+import { formatCurrency, formatDate, formatTime, getInitials, getOrderIdDisplay } from "@shared/utils";
 
 /* ─── Types ────────────────────────────────── */
 
@@ -51,30 +52,9 @@ function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] || STATUS_CONFIG.pending;
 }
 
-function formatDate(iso: string) {
-  if (!iso) return "\u2014";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function formatTime(iso: string) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-}
 
-function getOrderIdDisplay(id: string) {
-  return "#ORD-" + id.slice(-5).toUpperCase();
-}
 
-function getInitials(name: string) {
-  if (!name) return "??";
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-}
-
-function formatCurrency(amount: number) {
-  return "\u20B9" + amount.toLocaleString("en-IN");
-}
 
 export default function AdminOrderDetailPage() {
   const router = useRouter();
@@ -122,8 +102,8 @@ export default function AdminOrderDetailPage() {
         setInternalNotes(res.data.order.notes || "");
       })
       .catch((err) => {
-        if (err?.response?.status === 404) setError("Order not found.");
-        else setError(err?.response?.data?.message || err?.message || "Failed to load order.");
+        if (getApiErrorStatus(err) === 404) setError("Order not found.");
+        else setError(getApiErrorMessage(err, "Failed to load order."));
       })
       .finally(() => setLoading(false));
   }, [isAuthenticated, id, user?.role]);
@@ -139,8 +119,8 @@ export default function AdminOrderDetailPage() {
       setStatusMessage("Order status updated to \"" + getStatusConfig(newStatus).label + "\".");
       setConfirmStatus(null);
       setTimeout(() => setStatusMessage(null), 3000);
-    } catch (err: any) {
-      setStatusError(err?.response?.data?.message || "Failed to update order status.");
+    } catch (err: unknown) {
+      setStatusError(getApiErrorMessage(err, "Failed to update order status."));
     } finally { setStatusUpdating(false); }
   };
 
@@ -155,8 +135,8 @@ export default function AdminOrderDetailPage() {
       setOrder(res.data.order);
       setStatusMessage("Tracking ID and notes saved.");
       setTimeout(() => setStatusMessage(null), 3000);
-    } catch (err: any) {
-      setStatusError(err?.response?.data?.message || "Failed to save details.");
+    } catch (err: unknown) {
+      setStatusError(getApiErrorMessage(err, "Failed to save details."));
     } finally { setDetailsUpdating(false); }
   };
 
@@ -248,6 +228,9 @@ export default function AdminOrderDetailPage() {
             <Link href="/admin/orders" className="flex items-center gap-md px-md py-sm rounded-lg bg-primary-container text-on-primary">
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>shopping_cart</span><span className="font-label-md">Orders</span>
             </Link>
+            <Link href="/admin/deliveries" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
+              <span className="material-symbols-outlined">local_shipping</span><span className="font-label-md">Deliveries</span>
+            </Link>
             <Link href="/admin/farmers" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
               <span className="material-symbols-outlined">group</span><span className="font-label-md">Users</span>
             </Link>
@@ -273,14 +256,14 @@ export default function AdminOrderDetailPage() {
         <nav className="flex items-center gap-2 text-on-surface-variant font-label-md text-label-md mb-6">
           <Link href="/admin/orders" className="hover:text-primary transition-colors">Orders</Link>
           <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="text-on-surface">{getOrderIdDisplay(order._id)}</span>
+          <span className="text-on-surface">{getOrderIdDisplay(order._id, "ORD")}</span>
         </nav>
 
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
             <div className="flex items-center gap-4 mb-2">
-              <h2 className="font-headline-lg text-headline-lg text-primary">Order {getOrderIdDisplay(order._id)}</h2>
+              <h2 className="font-headline-lg text-headline-lg text-primary">Order {getOrderIdDisplay(order._id, "ORD")}</h2>
               <span className={"inline-flex items-center px-3 py-1 rounded-full font-label-sm text-label-sm gap-1 " + sc.bg + " " + sc.text}>
                 <span className={"w-2 h-2 rounded-full " + (order.status === "pending" || order.status === "out-for-delivery" ? "bg-current animate-pulse" : "bg-current")}></span>
                 {sc.label}

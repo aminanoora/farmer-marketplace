@@ -1,8 +1,19 @@
 import { Response } from "express";
+import { Model, Document } from "mongoose";
+
+/**
+ * Safely extract an error message from an unknown caught value.
+ * Use in catch blocks where the error type is not guaranteed.
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "An unexpected error occurred.";
+}
 
 export const sendSuccess = (
   res: Response,
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   statusCode = 200
 ): void => {
   res.status(statusCode).json({
@@ -15,7 +26,7 @@ export const sendError = (
   res: Response,
   message: string,
   statusCode = 500,
-  errors?: any[]
+  errors?: string[]
 ): void => {
   res.status(statusCode).json({
     success: false,
@@ -28,13 +39,13 @@ export const sendError = (
  * Paginate a query and return formatted results
  */
 export const paginateResults = async (
-  model: any,
-  query: Record<string, any>,
+  model: Model<Document>,
+  query: Record<string, unknown>,
   options: {
     page?: number;
     limit?: number;
-    populate?: any;
-    sort?: any;
+    populate?: string | { path: string; select?: string };
+    sort?: string | Record<string, 1 | -1>;
     select?: string;
   } = {}
 ) => {
@@ -45,9 +56,11 @@ export const paginateResults = async (
   const [results, total] = await Promise.all([
     model
       .find(query)
-      .populate(options.populate)
-      .sort(options.sort || "-createdAt")
-      .select(options.select)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .populate(options.populate as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .sort(options.sort as any)
+      .select(options.select as string)
       .skip(skip)
       .limit(limit),
     model.countDocuments(query),

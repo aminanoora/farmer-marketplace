@@ -4,6 +4,9 @@ import Product from "../models/Product";
 import Order from "../models/Order";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { uploadFilesToBlob, deleteBlobs } from "../middleware/upload.middleware";
+import { validateStatusTransition, OrderStatus } from "../utils/orderStatus";
+import { getErrorMessage } from "../utils/response";
+import { escapeRegex } from "../utils/sanitize";
 
 /* ─── Profile ─────────────────────────────────── */
 export const getProfile = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -15,8 +18,8 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
     res.json({ farmer: farmer.toJSON() });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -28,7 +31,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       "description", "bankDetails", "payoutMethod",
       "notificationSettings",
     ];
-    const updates: Record<string, any> = {};
+    const updates: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (req.body[field] !== undefined) {
         updates[field] = req.body[field];
@@ -46,8 +49,8 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     res.json({ farmer: farmer.toJSON() });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -87,13 +90,14 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
       category,
     } = req.query;
 
-    const filter: Record<string, any> = { farmer: req.user?._id };
+    const filter: Record<string, unknown> = { farmer: req.user?._id };
 
     // Text search across name & description
     if (search && typeof search === "string" && search.trim()) {
+      const safeSearch = escapeRegex(search.trim());
       filter.$or = [
-        { name: { $regex: search.trim(), $options: "i" } },
-        { description: { $regex: search.trim(), $options: "i" } },
+        { name: { $regex: safeSearch, $options: "i" } },
+        { description: { $regex: safeSearch, $options: "i" } },
       ];
     }
 
@@ -128,36 +132,56 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
     };
     const sortObj = sortMap[sort as string] || { createdAt: -1 };
 
-    const [products, total, allProducts] = await Promise.all([
+    const farmerId = req.user?._id;
+    const farmerMatch = { farmer: farmerId };
+
+    const [products, total, statsResult] = await Promise.all([
       Product.find(filter)
         .populate("category", "name slug icon")
         .sort(sortObj)
         .skip(skip)
         .limit(limitNum),
       Product.countDocuments(filter),
-      // Get all products for the farmer (for stats)
-      Product.find({ farmer: req.user?._id }),
+      // Compute stats via a single aggregation — avoids loading all docs into memory
+      Product.aggregate([
+        { $match: farmerMatch },
+        {
+          $group: {
+            _id: null,
+            totalProducts: { $sum: 1 },
+            activeProducts: {
+              $sum: { $cond: ["$isAvailable", 1, 0] },
+            },
+            lowStockProducts: {
+              $sum: {
+                $cond: [
+                  { $and: ["$isAvailable", { $gt: ["$quantity", 0] }, { $lte: ["$quantity", 20] }] },
+                  1,
+                  0,
+                ],
+              },
+            },
+            outOfStockProducts: {
+              $sum: { $cond: [{ $lte: ["$quantity", 0] }, 1, 0] },
+            },
+            pendingProducts: {
+              $sum: { $cond: [{ $eq: ["$approvalStatus", "pending"] }, 1, 0] },
+            },
+          },
+        },
+      ]),
     ]);
 
-    // Compute stats
-    const totalProducts = allProducts.length;
-    const activeProducts = allProducts.filter((p) => p.isAvailable);
-    const lowStockProducts = allProducts.filter(
-      (p) => p.isAvailable && p.quantity > 0 && p.quantity <= 20
-    );
-    const outOfStockProducts = allProducts.filter((p) => p.quantity <= 0);
-    const pendingProducts = allProducts.filter(
-      (p) => p.approvalStatus === "pending"
-    );
+    const s = statsResult[0] || {};
 
     res.json({
       products,
       stats: {
-        totalProducts,
-        activeProducts: activeProducts.length,
-        lowStockProducts: lowStockProducts.length,
-        outOfStockProducts: outOfStockProducts.length,
-        pendingProducts: pendingProducts.length,
+        totalProducts: s.totalProducts || 0,
+        activeProducts: s.activeProducts || 0,
+        lowStockProducts: s.lowStockProducts || 0,
+        outOfStockProducts: s.outOfStockProducts || 0,
+        pendingProducts: s.pendingProducts || 0,
       },
       pagination: {
         page: pageNum,
@@ -166,8 +190,8 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
         totalPages: Math.ceil(total / limitNum),
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -186,8 +210,8 @@ export const getProduct = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     res.json({ product });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -197,7 +221,7 @@ export const addProduct = async (req: AuthRequest, res: Response): Promise<void>
     const farmer = await requireVerifiedFarmer(req, res);
     if (!farmer) return;
 
-    const productData: Record<string, any> = { ...req.body };
+    const productData: Record<string, unknown> = { ...req.body };
 
     // Handle uploaded files — images are stored on Vercel Blob, so each entry
     // is an absolute public URL (serverless functions have no persistent disk).
@@ -223,8 +247,8 @@ export const addProduct = async (req: AuthRequest, res: Response): Promise<void>
     });
     await product.save();
     res.status(201).json({ product });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -243,7 +267,7 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const updates: Record<string, any> = {};
+    const updates: Record<string, unknown> = {};
 
     // Simple field updates
     const textFields = ["name", "description", "unit", "harvestDate", "seoDescription"];
@@ -325,8 +349,8 @@ export const updateProduct = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     res.json({ product: updated });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -353,8 +377,8 @@ export const deleteProduct = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     res.json({ message: "Product deleted successfully" });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -365,26 +389,175 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
       .populate("consumer", "name phone")
       .sort("-createdAt");
     res.json({ orders });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+};
+
+/**
+ * Quick-action: confirm a pending order
+ */
+export const confirmOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      farmer: req.user?._id,
+    });
+    if (!order) {
+      res.status(404).json({ message: "Order not found" });
+      return;
+    }
+
+    const transitionError = validateStatusTransition(
+      order.status as OrderStatus,
+      "confirmed",
+      "farmer"
+    );
+    if (transitionError) {
+      res.status(400).json({ message: transitionError });
+      return;
+    }
+
+    order.status = "confirmed";
+    await order.save();
+
+    // Notify consumer (best-effort)
+    try {
+      const consumer = await User.findById(order.consumer).select("name email");
+      const farmer = await User.findById(req.user?._id).select("name");
+      if (consumer && farmer) {
+        const { sendOrderStatusUpdateEmail } = await import("../utils/email");
+        await sendOrderStatusUpdateEmail(consumer.email, consumer.name, order._id.toString(), "confirmed", farmer.name);
+      }
+    } catch (emailError) {
+      console.error("[Farmer] Failed to send order confirmation email:", emailError);
+    }
+
+    res.json({ order, message: "Order confirmed successfully." });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+};
+
+/**
+ * Quick-action: cancel an order (restores stock)
+ */
+export const cancelOrder = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      farmer: req.user?._id,
+    });
+    if (!order) {
+      res.status(404).json({ message: "Order not found" });
+      return;
+    }
+
+    const transitionError = validateStatusTransition(
+      order.status as OrderStatus,
+      "cancelled",
+      "farmer"
+    );
+    if (transitionError) {
+      res.status(400).json({ message: transitionError });
+      return;
+    }
+
+    order.status = "cancelled";
+    await order.save();
+
+    // Restore product quantities
+    await Product.bulkWrite(
+      order.items.map((item) => ({
+        updateOne: {
+          filter: { _id: item.product },
+          update: { $inc: { quantity: item.quantity } },
+        },
+      }))
+    );
+
+    // Notify consumer (best-effort)
+    try {
+      const consumer = await User.findById(order.consumer).select("name email");
+      const farmer = await User.findById(req.user?._id).select("name");
+      if (consumer && farmer) {
+        const { sendOrderCancelledByFarmerEmail } = await import("../utils/email");
+        await sendOrderCancelledByFarmerEmail(consumer.email, consumer.name, order._id.toString(), farmer.name);
+      }
+    } catch (emailError) {
+      console.error("[Farmer] Failed to send cancellation email:", emailError);
+    }
+
+    res.json({ order, message: "Order cancelled successfully." });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
 export const updateOrderStatus = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { status } = req.body;
-    const order = await Order.findOneAndUpdate(
-      { _id: req.params.id, farmer: req.user?._id },
-      { status },
-      { new: true }
-    );
+    const validStatuses: OrderStatus[] = ["pending", "confirmed", "preparing", "out-for-delivery", "delivered", "cancelled"];
+
+    if (!status || !validStatuses.includes(status)) {
+      res.status(400).json({ message: "Invalid status value." });
+      return;
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      farmer: req.user?._id,
+    });
     if (!order) {
       res.status(404).json({ message: "Order not found" });
       return;
     }
+
+    // Validate the transition
+    const transitionError = validateStatusTransition(
+      order.status as OrderStatus,
+      status as OrderStatus,
+      "farmer"
+    );
+    if (transitionError) {
+      res.status(400).json({ message: transitionError });
+      return;
+    }
+
+    order.status = status;
+    await order.save();
+
+    // Restore stock when farmer cancels a pending order
+    if (status === "cancelled") {
+      await Product.bulkWrite(
+        order.items.map((item) => ({
+          updateOne: {
+            filter: { _id: item.product },
+            update: { $inc: { quantity: item.quantity } },
+          },
+        }))
+      );
+    }
+
+    // Notify consumer of status change (best-effort)
+    try {
+      const consumer = await User.findById(order.consumer).select("name email");
+      const farmer = await User.findById(req.user?._id).select("name");
+      if (consumer && farmer) {
+        const { sendOrderCancelledByFarmerEmail, sendOrderStatusUpdateEmail } = await import("../utils/email");
+        if (status === "cancelled") {
+          await sendOrderCancelledByFarmerEmail(consumer.email, consumer.name, order._id.toString(), farmer.name);
+        } else {
+          await sendOrderStatusUpdateEmail(consumer.email, consumer.name, order._id.toString(), status, farmer.name);
+        }
+      }
+    } catch (emailError) {
+      console.error("[Farmer] Failed to send order status email:", emailError);
+    }
+
     res.json({ order });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 /* ─── Change Password ─────────────────────────── */
@@ -418,8 +591,8 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
     await user.save();
 
     res.json({ message: "Password changed successfully." });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -436,7 +609,7 @@ export const getEarnings = async (req: AuthRequest, res: Response): Promise<void
       earnings: result?.earnings || 0,
       totalOrders: result?.totalOrders || 0,
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };

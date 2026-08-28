@@ -1,11 +1,18 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import User from "../models/User";
+import { env } from "../config/env";
 import Product from "../models/Product";
 import Order from "../models/Order";
 import Review from "../models/Review";
 import Category from "../models/Category";
+import Transaction from "../models/Transaction";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { validateStatusTransition, OrderStatus } from "../utils/orderStatus";
+import { getErrorMessage } from "../utils/response";
+import { escapeRegex } from "../utils/sanitize";
+import PlatformSettings from "../models/PlatformSettings";
+import { resetMaintenanceCache } from "../middleware/maintenance.middleware";
 
 /* ─── Get Admin User (for session restoration) ── */
 export const getAdminMe = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -16,8 +23,8 @@ export const getAdminMe = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
     res.json({ user: user.toJSON() });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -55,8 +62,8 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
 
     const token = jwt.sign(
       { userId: user._id.toString(), role: user.role },
-      process.env.JWT_SECRET || "fallback-secret",
-      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" } as jwt.SignOptions
+      env.jwtSecret,
+      { expiresIn: env.jwtExpiresIn } as jwt.SignOptions
     );
 
     res.json({
@@ -64,8 +71,8 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
       token,
       user: user.toJSON(),
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || "Admin login failed" });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) || "Admin login failed" });
   }
 };
 
@@ -94,8 +101,8 @@ export const getDashboard = async (_req: AuthRequest, res: Response): Promise<vo
         pendingVerifications,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -154,8 +161,86 @@ export const getDashboardOverview = async (_req: AuthRequest, res: Response): Pr
       },
       latestOrders,
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+};
+
+/* ─── Dashboard Transactions (payout overview) ── */
+export const getDashboardTransactions = async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const [
+      totalCommissionResult,
+      processedResult,
+      pendingResult,
+      recentTransactions,
+      topFarmersByPayout,
+    ] = await Promise.all([
+      // Total commission earned across all transactions
+      Transaction.aggregate([
+        { $group: { _id: null, total: { $sum: "$commissionAmount" }, count: { $sum: 1 } } },
+      ]),
+      // Processed payouts
+      Transaction.aggregate([
+        { $match: { status: "processed" } },
+        { $group: { _id: null, total: { $sum: "$farmerPayout" }, count: { $sum: 1 } } },
+      ]),
+      // Pending payouts
+      Transaction.aggregate([
+        { $match: { status: "pending" } },
+        { $group: { _id: null, total: { $sum: "$farmerPayout" }, count: { $sum: 1 } } },
+      ]),
+      // Recent 10 transactions with farmer info
+      Transaction.find()
+        .populate("farmer", "name farmName")
+        .populate("consumer", "name")
+        .sort("-createdAt")
+        .limit(10)
+        .lean(),
+      // Top 5 farmers by pending payout
+      Transaction.aggregate([
+        { $match: { status: "pending" } },
+        { $group: { _id: "$farmer", pendingPayout: { $sum: "$farmerPayout" }, orderCount: { $sum: 1 } } },
+        { $sort: { pendingPayout: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "farmer",
+          },
+        },
+        { $unwind: "$farmer" },
+        {
+          $project: {
+            farmerName: "$farmer.name",
+            farmName: "$farmer.farmName",
+            pendingPayout: 1,
+            orderCount: 1,
+          },
+        },
+      ]),
+    ]);
+
+    const platformSettings = await PlatformSettings.findOne().lean();
+    const commissionPercent = platformSettings?.commissionPercent ?? 5;
+
+    res.json({
+      summary: {
+        totalCommission: totalCommissionResult[0]?.total || 0,
+        totalTransactions: totalCommissionResult[0]?.count || 0,
+        processedPayouts: processedResult[0]?.total || 0,
+        processedCount: processedResult[0]?.count || 0,
+        pendingPayouts: pendingResult[0]?.total || 0,
+        pendingCount: pendingResult[0]?.count || 0,
+        commissionPercent,
+      },
+      recentTransactions,
+      topFarmersByPayout,
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -172,7 +257,7 @@ export const getFarmers = async (req: AuthRequest, res: Response): Promise<void>
     } = req.query as Record<string, string>;
 
     // Build filter
-    const filter: Record<string, any> = {};
+    const filter: Record<string, unknown> = {};
 
     // Role filter — "all" or omitted means no role filter
     if (role && role !== "all") {
@@ -195,7 +280,7 @@ export const getFarmers = async (req: AuthRequest, res: Response): Promise<void>
 
     // Search filter
     if (search && search.trim()) {
-      const q = search.trim();
+      const q = escapeRegex(search.trim());
       const searchRegex = { $regex: q, $options: "i" };
       filter.$or = [
         { name: searchRegex },
@@ -256,8 +341,8 @@ export const getFarmers = async (req: AuthRequest, res: Response): Promise<void>
         hasPrev: pageNum > 1,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -273,8 +358,8 @@ export const approveFarmer = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
     res.json({ farmer: farmer.toJSON(), message: "Farmer approved successfully" });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -290,8 +375,8 @@ export const rejectFarmer = async (req: AuthRequest, res: Response): Promise<voi
       return;
     }
     res.json({ farmer: farmer.toJSON(), message: "Farmer rejected" });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -299,11 +384,49 @@ export const rejectFarmer = async (req: AuthRequest, res: Response): Promise<voi
 export const createCategory = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name, slug, description, icon } = req.body;
-    const category = new Category({ name, slug, description, icon });
+
+    // Validate required fields
+    if (!name || typeof name !== "string" || !name.trim()) {
+      res.status(400).json({ message: "Category name is required." });
+      return;
+    }
+    if (!slug || typeof slug !== "string" || !slug.trim()) {
+      res.status(400).json({ message: "Category slug is required." });
+      return;
+    }
+
+    // Validate slug format: lowercase alphanumeric with hyphens only
+    const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    if (!slugRegex.test(slug.trim())) {
+      res.status(400).json({
+        message: "Slug must be lowercase alphanumeric with hyphens (e.g., 'fresh-vegetables').",
+      });
+      return;
+    }
+
+    // Check for duplicate name or slug
+    const existing = await Category.findOne({
+      $or: [{ name: name.trim() }, { slug: slug.trim() }],
+    });
+    if (existing) {
+      res.status(400).json({
+        message: existing.name === name.trim()
+          ? `Category "${name.trim()}" already exists.`
+          : `Slug "${slug.trim()}" is already in use.`,
+      });
+      return;
+    }
+
+    const category = new Category({
+      name: name.trim(),
+      slug: slug.trim(),
+      description: description?.trim() || undefined,
+      icon: icon?.trim() || undefined,
+    });
     await category.save();
     res.status(201).json({ category });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -321,7 +444,7 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
     } = req.query as Record<string, string>;
 
     // Build the base filter
-    const filter: Record<string, any> = {};
+    const filter: Record<string, unknown> = {};
 
     // Status filter
     if (status && status !== "all") {
@@ -330,39 +453,47 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
 
     // Date range filter
     if (dateFrom || dateTo) {
-      filter.createdAt = {};
-      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+      const dateRange: { $gte?: Date; $lte?: Date } = {};
+      if (dateFrom) dateRange.$gte = new Date(dateFrom);
+      if (dateTo) dateRange.$lte = new Date(dateTo);
+      filter.createdAt = dateRange;
     }
 
-    // Search filter — match order ID, customer name, or farm name
-    // We'll handle search by first finding matching user IDs
-    let searchUserIds: string[] | undefined;
+    // Search filter — match customer name, farm name, or exact order ID.
     if (search && search.trim()) {
       const q = search.trim();
       // Find users whose name or farmName matches (case-insensitive)
+      const safeQ = escapeRegex(q);
       const matchedUsers = await User.find({
         $or: [
-          { name: { $regex: q, $options: "i" } },
-          { farmName: { $regex: q, $options: "i" } },
+          { name: { $regex: safeQ, $options: "i" } },
+          { farmName: { $regex: safeQ, $options: "i" } },
         ],
       }).select("_id").lean();
-      searchUserIds = matchedUsers.map((u) => u._id.toString());
 
-      // Also try to match order ID directly (partial match on _id)
-      const orderIdMatch = q.replace(/^#ORD-/i, "");
-      filter.$or = [
-        // Orders where consumer._id is in matched user IDs
-        ...(searchUserIds.length > 0
-          ? [{ consumer: { $in: matchedUsers.map((u) => u._id) } }]
-          : []),
-        // Orders where farmer._id is in matched user IDs
-        ...(searchUserIds.length > 0
-          ? [{ farmer: { $in: matchedUsers.map((u) => u._id) } }]
-          : []),
-        // Direct _id match (case-insensitive) — match by last 5 chars or full ID
-        { _id: { $regex: orderIdMatch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
-      ];
+      const userIds = matchedUsers.map((u) => u._id);
+
+      // Check if the search term is a valid 24-char hex string (ObjectId).
+      // If so, allow an exact _id lookup — no regex, no ReDoS risk.
+      const trimmedSearch = q.replace(/^#ORD-/i, "");
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(trimmedSearch);
+
+      const orClauses: Record<string, unknown>[] = [];
+      if (userIds.length > 0) {
+        orClauses.push({ consumer: { $in: userIds } });
+        orClauses.push({ farmer: { $in: userIds } });
+      }
+      if (isObjectId) {
+        orClauses.push({ _id: trimmedSearch });
+      }
+
+      // If nothing matched, add an impossible condition so zero results
+      // are returned instead of leaking all orders.
+      if (orClauses.length === 0) {
+        orClauses.push({ _id: null });
+      }
+
+      filter.$or = orClauses;
     }
 
     // Parse sort parameter
@@ -423,8 +554,8 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
         hasPrev: pageNum > 1,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -432,8 +563,8 @@ export const getOrders = async (req: AuthRequest, res: Response): Promise<void> 
 export const updateOrderStatus = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { status } = req.body;
-    const validStatuses = ["pending", "confirmed", "preparing", "out-for-delivery", "delivered", "cancelled"];
-    
+    const validStatuses: OrderStatus[] = ["pending", "confirmed", "preparing", "out-for-delivery", "delivered", "cancelled"];
+
     if (!status || !validStatuses.includes(status)) {
       res.status(400).json({ message: "Invalid status value." });
       return;
@@ -445,8 +576,31 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
+    // Validate the transition
+    const transitionError = validateStatusTransition(
+      order.status as OrderStatus,
+      status as OrderStatus,
+      "admin"
+    );
+    if (transitionError) {
+      res.status(400).json({ message: transitionError });
+      return;
+    }
+
     order.status = status;
     await order.save();
+
+    // Restore stock when admin cancels an order
+    if (status === "cancelled") {
+      await Product.bulkWrite(
+        order.items.map((item) => ({
+          updateOne: {
+            filter: { _id: item.product },
+            update: { $inc: { quantity: item.quantity } },
+          },
+        }))
+      );
+    }
 
     // Populate the saved document in-place to avoid a second query
     await order.populate([
@@ -455,9 +609,25 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       { path: "items.product", select: "name images" },
     ]);
 
+    // Notify consumer of status change (best-effort)
+    try {
+      const { sendOrderStatusUpdateEmail, sendOrderCancelledByFarmerEmail } = await import("../utils/email");
+      const populatedOrder = order as unknown as { consumer: { name: string; email: string }; farmer: { name: string } };
+      if (populatedOrder.consumer?.email) {
+        const farmerName = populatedOrder.farmer?.name || "Farmer";
+        if (status === "cancelled") {
+          await sendOrderCancelledByFarmerEmail(populatedOrder.consumer.email, populatedOrder.consumer.name, order._id.toString(), farmerName);
+        } else {
+          await sendOrderStatusUpdateEmail(populatedOrder.consumer.email, populatedOrder.consumer.name, order._id.toString(), status, farmerName);
+        }
+      }
+    } catch (emailError) {
+      console.error("[Admin] Failed to send order status email:", emailError);
+    }
+
     res.json({ order });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -476,8 +646,8 @@ export const getOrderById = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     res.json({ order });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -490,7 +660,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    let products: any[] = [];
+    let products: Awaited<ReturnType<typeof Product.find>> = [];
     if (user.role === "farmer") {
       // Admin review view: return all of the farmer's products (pending/approved/rejected)
       products = await Product.find({ farmer: user._id })
@@ -505,8 +675,8 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
     });
 
     res.json({ user, products, orderCount });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -539,8 +709,8 @@ export const toggleUserStatus = async (req: AuthRequest, res: Response): Promise
       user: user.toJSON(),
       message: isActive ? "User has been activated." : "User has been blocked/suspended.",
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -567,8 +737,8 @@ export const updateOrderDetails = async (req: AuthRequest, res: Response): Promi
     ]);
 
     res.json({ order });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -603,8 +773,8 @@ export const toggleProductStatus = async (req: AuthRequest, res: Response): Prom
       product,
       message: isAvailable ? "Product approved and is now visible on the platform." : "Product has been hidden from the platform.",
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -621,7 +791,7 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
       limit = "10",
     } = req.query as Record<string, string>;
 
-    const filter: Record<string, any> = {};
+    const filter: Record<string, unknown> = {};
 
     // Approval status filter (takes precedence over legacy status filter)
     if (approvalStatus && approvalStatus !== "all") {
@@ -637,7 +807,7 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
 
     // Search by product name or farmer name (via lookup)
     if (search && search.trim()) {
-      const q = search.trim();
+      const q = escapeRegex(search.trim());
       const searchRegex = { $regex: q, $options: "i" };
       filter.$or = [
         { name: searchRegex },
@@ -699,8 +869,8 @@ export const getProducts = async (req: AuthRequest, res: Response): Promise<void
         hasPrev: pageNum > 1,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -762,8 +932,8 @@ export const getProductById = async (req: AuthRequest, res: Response): Promise<v
         revenue: orderStats?.revenue || 0,
       },
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -783,8 +953,8 @@ export const approveProduct = async (req: AuthRequest, res: Response): Promise<v
       product,
       message: "Product has been approved and is now visible on the platform.",
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -804,8 +974,8 @@ export const rejectProduct = async (req: AuthRequest, res: Response): Promise<vo
       product,
       message: "Product has been rejected and is hidden from the platform.",
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -860,7 +1030,68 @@ export const getAnalytics = async (_req: AuthRequest, res: Response): Promise<vo
       topFarmers: topFarmersResult,
       categoryDistribution,
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+};
+
+/* ─── Platform Settings ─────────────────────────── */
+
+/** GET /api/admin/settings — retrieve platform settings */
+export const getSettings = async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    let settings = await PlatformSettings.findOne();
+    if (!settings) {
+      settings = await PlatformSettings.create({});
+    }
+    res.json({ settings });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+};
+
+/** PATCH /api/admin/settings — update platform settings (partial) */
+export const updateSettings = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const allowedFields = [
+      "commissionPercent",
+      "minPayoutThreshold",
+      "maxDeliveryRadiusKm",
+      "supportEmail",
+      "supportPhone",
+      "aboutUs",
+      "termsUrl",
+      "privacyUrl",
+      "isPlatformActive",
+      "maintenanceMode",
+    ];
+
+    const updates: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ message: "No valid fields to update" });
+      return;
+    }
+
+    updates.updatedBy = req.user?._id;
+
+    const settings = await PlatformSettings.findOneAndUpdate({}, updates, {
+      new: true,
+      upsert: true,
+    });
+
+    // Reset maintenance mode cache so the change takes effect immediately
+    if ("maintenanceMode" in updates) {
+      resetMaintenanceCache();
+    }
+
+    res.json({ message: "Settings updated", settings });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };

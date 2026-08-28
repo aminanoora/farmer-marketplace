@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
-import { paymentAPI } from "@/lib/api";
+import { paymentAPI, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency, formatDate, getOrderIdDisplay } from "@shared/utils";
 
 /* ─── Types ──────────────────────────────────── */
 
@@ -51,14 +52,7 @@ function getMethodConfig(method: string) {
   return METHOD_CONFIG[method] || { label: method, icon: "payments", color: "text-on-surface-variant", bg: "bg-surface-container-high" };
 }
 
-function formatDate(iso: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function getOrderIdDisplay(id: string) {
-  return `#KM-${id.slice(-5).toUpperCase()}`;
-}
 
 /* ─── Component ──────────────────────────────── */
 
@@ -97,7 +91,7 @@ export default function PaymentsPage() {
       .getPaymentMethods()
       .then((res) => setData(res.data))
       .catch((err) => {
-        const msg = err?.response?.data?.message || err?.message || "Failed to load payment methods.";
+        const msg = getApiErrorMessage(err, "Failed to load payment methods.");
         setError(msg);
         showError(msg);
       })
@@ -229,7 +223,7 @@ export default function PaymentsPage() {
                           <p className="text-label-sm text-on-surface-variant">Orders</p>
                         </div>
                         <div className="text-center p-3 rounded-lg bg-surface-container-low">
-                          <p className="font-bold text-headline-md text-primary">₹{method.totalSpent.toLocaleString("en-IN")}</p>
+                          <p className="font-bold text-headline-md text-primary">{formatCurrency(method.totalSpent)}</p>
                           <p className="text-label-sm text-on-surface-variant">Total Spent</p>
                         </div>
                         <div className="text-center p-3 rounded-lg bg-surface-container-low">
@@ -248,7 +242,7 @@ export default function PaymentsPage() {
                                 className="flex items-center justify-between p-2 rounded-lg hover:bg-surface-container-low transition-colors text-sm">
                                 <span className="font-label-md text-primary">{getOrderIdDisplay(o._id)}</span>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-on-surface">₹{o.totalAmount.toLocaleString("en-IN")}</span>
+                                  <span className="font-bold text-on-surface">{formatCurrency(o.totalAmount)}</span>
                                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                                     o.paymentStatus === "paid" ? "bg-[#dcfce7] text-[#166534]" :
                                     o.paymentStatus === "pending" ? "bg-surface-container-high text-on-surface-variant" :

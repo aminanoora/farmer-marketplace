@@ -23,5 +23,9 @@ const reviewSchema = new Schema<IReview>(
 
 // Prevent duplicate reviews from same consumer on same product
 reviewSchema.index({ consumer: 1, product: 1 }, { unique: true, sparse: true });
+// Farmer review lookups (farmer profile page, public reviews)
+reviewSchema.index({ farmer: 1, createdAt: -1 });
+// Product review lookups (product detail page)
+reviewSchema.index({ product: 1, createdAt: -1 });
 
 export default mongoose.model<IReview>("Review", reviewSchema);

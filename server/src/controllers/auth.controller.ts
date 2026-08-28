@@ -4,12 +4,14 @@ import jwt from "jsonwebtoken";
 import User from "../models/User";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { sendPasswordResetEmail } from "../utils/email";
+import { env } from "../config/env";
+import { getErrorMessage } from "../utils/response";
 
 const generateToken = (userId: string, role: string): string => {
   return jwt.sign(
     { userId, role },
-    process.env.JWT_SECRET || "fallback-secret",
-    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" } as jwt.SignOptions
+    env.jwtSecret,
+    { expiresIn: env.jwtExpiresIn } as jwt.SignOptions
   );
 };
 
@@ -41,8 +43,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       token,
       user: user.toJSON(),
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || "Registration failed" });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) || "Registration failed" });
   }
 };
 
@@ -78,8 +80,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       token,
       user: user.toJSON(),
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || "Login failed" });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) || "Login failed" });
   }
 };
 
@@ -91,8 +93,88 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
     res.json({ user: user.toJSON() });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+};
+
+/**
+ * Update consumer profile (name, phone)
+ */
+export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
+    const { name, phone } = req.body;
+    const updates: Record<string, string> = {};
+
+    if (name !== undefined) {
+      if (!name.trim()) {
+        res.status(400).json({ message: "Name cannot be empty." });
+        return;
+      }
+      updates.name = name.trim();
+    }
+    if (phone !== undefined) {
+      updates.phone = phone.trim();
+    }
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ message: "No fields to update." });
+      return;
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    res.json({ user: updatedUser?.toJSON(), message: "Profile updated successfully." });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
+  }
+};
+
+/**
+ * Change password (requires current password)
+ */
+export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ message: "Current password and new password are required." });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ message: "New password must be at least 6 characters." });
+      return;
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      res.status(401).json({ message: "Current password is incorrect." });
+      return;
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password changed successfully." });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -131,8 +213,8 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       message:
         "If an account with that email exists, a reset link has been sent.",
     });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -167,7 +249,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     await user.save();
 
     res.json({ message: "Password has been reset successfully. You can now sign in." });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ message: getErrorMessage(error) });
   }
 };

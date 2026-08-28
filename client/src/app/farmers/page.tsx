@@ -59,7 +59,7 @@ export default function FarmersPage() {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, any> = { page, limit: 12 };
+      const params: Record<string, string | number> = { page, limit: 12 };
       if (submittedSearch.trim()) params.search = submittedSearch.trim();
       const res = await consumerAPI.getFarmers(params);
       setFarmers(res.data.farmers || []);
@@ -189,7 +189,7 @@ export default function FarmersPage() {
                     {/* Avatar */}
                     <div className="relative w-24 h-24 rounded-full overflow-hidden bg-surface-container-high border-2 border-surface-variant mb-4 group-hover:border-primary transition-colors">
                       {farmer.avatar ? (
-                        <Image fill sizes="96px" className="object-cover" src={farmer.avatar} alt={farmer.name} onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/400x300/e4e2dd/414844?text=${encodeURIComponent(farmer.name.charAt(0))}`; } }} />
+                        <Image fill sizes="96px" className="object-cover" src={farmer.avatar} alt={farmer.name} onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/400x300/e4e2dd/414844.png?text=${encodeURIComponent(farmer.name.charAt(0))}`; } }} />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-primary/10">
                           <span className="material-symbols-outlined text-[40px] text-primary">agriculture</span>

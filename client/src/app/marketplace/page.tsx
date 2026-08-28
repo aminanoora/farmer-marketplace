@@ -96,7 +96,7 @@ export default function MarketplacePage() {
     setLoading(true);
     setError(null);
 
-    const params: Record<string, any> = {
+    const params: Record<string, string | number> = {
       page: currentPage,
       limit: 12,
     };
@@ -326,7 +326,7 @@ export default function MarketplacePage() {
                           className="object-cover transition-transform duration-500 group-hover:scale-110"
                           alt={product.name}
                           src={imageSrc}
-                          onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/600x450/e4e2dd/414844?text=${encodeURIComponent(product.name)}`; } }}
+                          onError={(e) => { const el = e.currentTarget; if (!el.dataset.fb) { el.dataset.fb = "1"; el.src = `https://placehold.co/600x450/e4e2dd/414844.png?text=${encodeURIComponent(product.name)}`; } }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">

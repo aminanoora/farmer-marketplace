@@ -2,13 +2,12 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import dotenv from "dotenv";
 import { env } from "./config/env";
 import { connectDatabase } from "./config/database";
 import { errorHandler } from "./middleware/error.middleware";
+import { sanitizeInput } from "./middleware/sanitize.middleware";
+import { maintenanceMode } from "./middleware/maintenance.middleware";
 import routes from "./routes";
-
-dotenv.config();
 
 const app = express();
 
@@ -18,6 +17,23 @@ app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:3000", creden
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ─── Input Sanitization (XSS prevention) ──────
+app.use(sanitizeInput);
+
+// ─── Maintenance Mode ─────────────────────────
+// Blocks non-admin API routes when PlatformSettings.maintenanceMode is true.
+// Admin routes bypass this so admins can still log in and toggle it off.
+// Health check and root are always accessible.
+app.use("/api", (req, res, next) => {
+  // Skip maintenance check for admin routes — admins must be able to
+  // log in and disable maintenance mode from the dashboard.
+  if (req.path.startsWith("/admin")) {
+    next();
+    return;
+  }
+  maintenanceMode(req, res, next);
+});
 
 // ─── Root & Health (no DB required) ─────────────
 app.get("/", (_req, res) => {

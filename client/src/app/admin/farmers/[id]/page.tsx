@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
+import { formatCurrency, formatDate, formatDateTime, getInitials } from "@shared/utils";
 
 /* ─── Types ────────────────────────────────── */
 
@@ -47,26 +48,8 @@ const STATUS_BADGES: Record<string, { label: string; bg: string; text: string; d
   suspended: { label: "Suspended", bg: "bg-error-container",  text: "text-on-error-container", dot: "bg-error" },
 };
 
-function formatDate(iso: string) {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function formatDateTime(iso: string) {
-  if (!iso) return "---";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + " at " +
-    d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-}
 
-function getInitials(name: string) {
-  if (!name) return "?";
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-}
-
-function formatCurrency(amount: number) {
-  return "\u20B9" + amount.toLocaleString("en-IN");
-}
 
 export default function AdminUserDetailPage() {
   const router = useRouter();
@@ -102,8 +85,8 @@ export default function AdminUserDetailPage() {
     adminAPI.getUser(id)
       .then((res) => setData(res.data))
       .catch((err) => {
-        if (err?.response?.status === 404) setError("User not found.");
-        else setError(err?.response?.data?.message || err?.message || "Failed to load user.");
+        if (getApiErrorStatus(err) === 404) setError("User not found.");
+        else setError(getApiErrorMessage(err, "Failed to load user."));
       })
       .finally(() => setLoading(false));
   }, [isAuthenticated, id, user?.role]);
@@ -132,8 +115,8 @@ export default function AdminUserDetailPage() {
       setData({ ...data, user: res.data.user });
       showSuccess(res.data.message);
       setConfirmAction(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to update user status.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to update user status."));
     } finally { setStatusUpdating(false); }
   };
 
@@ -146,8 +129,8 @@ export default function AdminUserDetailPage() {
       setData(res.data);
       showSuccess("Farmer has been approved and verified.");
       setConfirmAction(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to approve farmer.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to approve farmer."));
     } finally { setStatusUpdating(false); }
   };
 
@@ -160,8 +143,8 @@ export default function AdminUserDetailPage() {
       setData(res.data);
       showSuccess("Farmer verification has been rejected.");
       setConfirmAction(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to reject farmer.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to reject farmer."));
     } finally { setStatusUpdating(false); }
   };
 
@@ -177,8 +160,8 @@ export default function AdminUserDetailPage() {
       }
       showSuccess(res.data.message);
       setConfirmProductId(null);
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to update product.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to update product."));
     } finally { setProductUpdating(null); }
   };
 
@@ -282,6 +265,9 @@ export default function AdminUserDetailPage() {
             </Link>
             <Link href="/admin/orders" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
               <span className="material-symbols-outlined">shopping_cart</span><span className="font-label-md">Orders</span>
+            </Link>
+            <Link href="/admin/deliveries" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
+              <span className="material-symbols-outlined">local_shipping</span><span className="font-label-md">Deliveries</span>
             </Link>
             <Link href="/admin/farmers" className="flex items-center gap-md px-md py-sm rounded-lg bg-primary-container text-on-primary">
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>group</span><span className="font-label-md">Users</span>

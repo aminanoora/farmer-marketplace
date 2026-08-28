@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import User, { IUser } from "../models/User";
+import { env } from "../config/env";
 
 export interface AuthRequest extends Request {
   user?: IUser;
@@ -27,10 +28,7 @@ export const authenticate = async (
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "fallback-secret"
-    ) as JwtPayload;
+    const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload;
 
     const user = await User.findById(decoded.userId);
     if (!user) {
@@ -49,7 +47,7 @@ export const authenticate = async (
 
     req.user = user;
     next();
-  } catch (error) {
+  } catch {
     res.status(401).json({ message: "Invalid or expired token." });
   }
 };

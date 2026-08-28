@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/admin-auth-context";
-import { adminAPI } from "@/lib/api";
+import { adminAPI, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency, formatDate, getOrderIdDisplay } from "@shared/utils";
 
 interface DashboardStats {
   totalFarmers: number; totalConsumers: number; totalProducts: number;
@@ -21,6 +22,44 @@ interface LatestOrder {
 
 interface DashboardData { stats: DashboardStats; latestOrders: LatestOrder[]; }
 
+interface TransactionSummary {
+  totalCommission: number;
+  totalTransactions: number;
+  processedPayouts: number;
+  processedCount: number;
+  pendingPayouts: number;
+  pendingCount: number;
+  commissionPercent: number;
+}
+
+interface TransactionFarmer { _id: string; name: string; farmName?: string; }
+interface TransactionConsumer { _id: string; name: string; }
+
+interface Transaction {
+  _id: string;
+  farmer: TransactionFarmer;
+  consumer: TransactionConsumer;
+  subtotal: number;
+  commissionPercent: number;
+  commissionAmount: number;
+  farmerPayout: number;
+  status: string;
+  createdAt: string;
+}
+
+interface TopFarmerPayout {
+  farmerName: string;
+  farmName?: string;
+  pendingPayout: number;
+  orderCount: number;
+}
+
+interface TransactionData {
+  summary: TransactionSummary;
+  recentTransactions: Transaction[];
+  topFarmersByPayout: TopFarmerPayout[];
+}
+
 const STATUS_STYLES: Record<string, { label: string; bg: string; text: string }> = {
   delivered:         { label: "Delivered",        bg: "bg-primary-fixed",   text: "text-on-primary-fixed-variant" },
   "out-for-delivery":{ label: "Out for Delivery", bg: "bg-tertiary-fixed",  text: "text-on-tertiary-fixed-variant" },
@@ -34,39 +73,26 @@ function getStatusStyle(status: string) {
   return STATUS_STYLES[status] || STATUS_STYLES.pending;
 }
 
-function formatDate(iso: string) {
-  if (!iso) return "---";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
 
-function formatCurrency(amount: number) {
-  return "\u20B9" + amount.toLocaleString("en-IN");
-}
 
-function getOrderIdDisplay(id: string) {
-  return "#KM-" + id.slice(-5).toUpperCase();
+function getTimeAgo(iso: string) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return mins + "m ago";
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + "h ago";
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + "d ago";
+  return formatDate(iso);
 }
-
-interface ActivityItem {
-  icon: string;
-  iconBg: string;
-  iconColor: string;
-  text: React.ReactNode;
-  time: string;
-}
-
-const RECENT_ACTIVITIES: ActivityItem[] = [
-  { icon: "add_task", iconBg: "bg-primary-fixed", iconColor: "text-primary", text: <>New crop listed by <span className="font-bold">Green Roots</span></>, time: "2 mins ago" },
-  { icon: "chat_bubble", iconBg: "bg-secondary-fixed", iconColor: "text-secondary", text: <>Wholesale inquiry from <span className="font-bold">Gourmet Foods</span></>, time: "15 mins ago" },
-  { icon: "verified", iconBg: "bg-primary-fixed", iconColor: "text-primary", text: <>Farmer <span className="font-bold">Ramesh Patel</span> verified</>, time: "1 hour ago" },
-  { icon: "cancel", iconBg: "bg-error-container", iconColor: "text-error", text: <>Order <span className="font-bold">#KM-1018</span> cancelled</>, time: "3 hours ago" },
-  { icon: "payments", iconBg: "bg-primary-fixed", iconColor: "text-primary", text: <>Payout of <span className="font-bold">\u20B942,000</span> released</>, time: "5 hours ago" },
-];
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, logout } = useAdminAuth();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [txData, setTxData] = useState<TransactionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -91,9 +117,15 @@ export default function AdminDashboardPage() {
     if (!isAuthenticated || user?.role !== "admin") return;
     setLoading(true);
     setError(null);
-    adminAPI.getDashboardOverview()
-      .then((res) => setData(res.data))
-      .catch((err) => setError(err?.response?.data?.message || err?.message || "Failed to load dashboard."))
+    Promise.all([
+      adminAPI.getDashboardOverview(),
+      adminAPI.getDashboardTransactions(),
+    ])
+      .then(([overviewRes, txRes]) => {
+        setData(overviewRes.data);
+        setTxData(txRes.data);
+      })
+      .catch((err) => setError(getApiErrorMessage(err, "Failed to load dashboard.")))
       .finally(() => setLoading(false));
   }, [isAuthenticated, user?.role]);
 
@@ -174,6 +206,9 @@ export default function AdminDashboardPage() {
             </Link>
             <Link href="/admin/orders" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
               <span className="material-symbols-outlined">shopping_cart</span><span className="font-label-md">Orders</span>
+            </Link>
+            <Link href="/admin/deliveries" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
+              <span className="material-symbols-outlined">local_shipping</span><span className="font-label-md">Deliveries</span>
             </Link>
             <Link href="/admin/farmers" className="flex items-center gap-md px-md py-sm rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors">
               <span className="material-symbols-outlined">group</span><span className="font-label-md">Users</span>
@@ -335,24 +370,103 @@ export default function AdminDashboardPage() {
                   </div>
                 </section>
 
+                {/* ─── Payout Summary ──────────────────── */}
                 <section className="bg-white rounded-xl border border-outline-variant">
-                  <div className="px-lg py-md border-b border-outline-variant"><h3 className="font-headline-md text-headline-md text-primary">Recent Activity</h3></div>
-                  <div className="p-lg space-y-lg relative">
-                    <div className="absolute left-[36px] top-lg bottom-lg w-[1px] bg-outline-variant" />
-                    {RECENT_ACTIVITIES.map((activity, idx) => (
-                      <div key={idx} className="flex gap-md relative">
-                        <div className={"w-8 h-8 rounded-full " + activity.iconBg + " border-4 border-white flex items-center justify-center z-10"}>
-                          <span className={"material-symbols-outlined " + activity.iconColor + " text-[16px]"}>{activity.icon}</span>
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-label-md text-label-md text-on-surface">{activity.text}</p>
-                          <p className="font-label-sm text-label-sm text-on-surface-variant opacity-70">{activity.time}</p>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="px-lg py-md border-b border-outline-variant">
+                    <h3 className="font-headline-md text-headline-md text-primary">Payout Overview</h3>
                   </div>
-                  <div className="p-md text-center border-t border-outline-variant">
-                    <button className="text-primary font-label-md text-label-md hover:underline">See full log</button>
+                  <div className="p-lg">
+                    {txData ? (
+                      <div className="space-y-lg">
+                        <div className="grid grid-cols-3 gap-md">
+                          <div className="p-md bg-surface-container-low rounded-lg text-center">
+                            <p className="font-headline-md text-headline-md text-primary">{formatCurrency(txData.summary.totalCommission)}</p>
+                            <p className="font-label-sm text-label-sm text-on-surface-variant">Commission Earned</p>
+                          </div>
+                          <div className="p-md bg-surface-container-low rounded-lg text-center">
+                            <p className="font-headline-md text-headline-md text-primary">{formatCurrency(txData.summary.processedPayouts)}</p>
+                            <p className="font-label-sm text-label-sm text-on-surface-variant">Paid Out</p>
+                          </div>
+                          <div className="p-md bg-surface-container-low rounded-lg text-center">
+                            <p className="font-headline-md text-headline-md text-tertiary">{formatCurrency(txData.summary.pendingPayouts)}</p>
+                            <p className="font-label-sm text-label-sm text-on-surface-variant">Pending</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-label-sm text-on-surface-variant">
+                          <span>{txData.summary.totalTransactions} transactions</span>
+                          <span>{txData.summary.commissionPercent}% commission</span>
+                        </div>
+                        {txData.topFarmersByPayout.length > 0 && (
+                          <div className="border-t border-outline-variant pt-lg">
+                            <p className="font-label-md text-label-md text-on-surface-variant mb-md">Top Payouts Pending</p>
+                            <div className="space-y-sm">
+                              {txData.topFarmersByPayout.map((f, idx) => (
+                                <div key={idx} className="flex items-center justify-between py-sm">
+                                  <div className="flex items-center gap-sm">
+                                    <div className="w-7 h-7 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-[10px] font-bold">
+                                      {(f.farmerName || "?").charAt(0)}
+                                    </div>
+                                    <div>
+                                      <p className="font-label-md text-label-md text-on-surface truncate max-w-[120px]">{f.farmerName}</p>
+                                      {f.farmName && <p className="font-label-sm text-on-surface-variant truncate max-w-[120px]">{f.farmName}</p>}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-label-md text-primary font-bold">{formatCurrency(f.pendingPayout)}</p>
+                                    <p className="font-label-sm text-on-surface-variant">{f.orderCount} orders</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center py-lg">
+                        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* ─── Recent Transactions ──────────────── */}
+                <section className="bg-white rounded-xl border border-outline-variant">
+                  <div className="px-lg py-md border-b border-outline-variant">
+                    <h3 className="font-headline-md text-headline-md text-primary">Recent Transactions</h3>
+                  </div>
+                  <div className="p-lg space-y-md relative">
+                    {(txData?.recentTransactions || []).length > 0 ? (
+                      <>
+                        <div className="absolute left-[36px] top-lg bottom-lg w-[1px] bg-outline-variant" />
+                        {txData!.recentTransactions.map((tx) => {
+                          const isPending = tx.status === "pending";
+                          return (
+                            <div key={tx._id} className="flex gap-md relative">
+                              <div className={"w-8 h-8 rounded-full " + (isPending ? "bg-surface-container-high" : "bg-primary-fixed") + " border-4 border-white flex items-center justify-center z-10"}>
+                                <span className={"material-symbols-outlined " + (isPending ? "text-on-surface-variant" : "text-primary") + " text-[16px]"}>
+                                  {isPending ? "hourglass_empty" : "check_circle"}
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-label-md text-label-md text-on-surface">
+                                  {tx.farmer?.farmName || tx.farmer?.name || "Farmer"} — {formatCurrency(tx.farmerPayout)} payout
+                                </p>
+                                <p className="font-label-sm text-on-surface-variant opacity-70">
+                                  {tx.status === "processed" ? "Paid" : "Pending"} · {getTimeAgo(tx.createdAt)}
+                                </p>
+                              </div>
+                              <span className={"px-sm py-1 rounded-full text-[10px] font-bold " + (isPending ? "bg-surface-container-high text-on-surface-variant" : "bg-primary-fixed text-on-primary-fixed-variant")}>
+                                {tx.status}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <div className="text-center py-lg text-on-surface-variant font-body-md">
+                        No transactions yet.
+                      </div>
+                    )}
                   </div>
                 </section>
               </div>

@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
-import { farmerAPI } from "@/lib/api";
+import { farmerAPI, getApiErrorMessage, getApiErrorStatus } from "@/lib/api";
+import { formatCurrency, formatDate, formatTime, getInitials, getOrderIdDisplay } from "@shared/utils";
 
 /* ─── Types ──────────────────────────────────── */
 interface OrderProduct {
@@ -89,40 +90,9 @@ function getStatusStyle(status: string) {
 }
 
 /* ─── Format helpers ─────────────────────────── */
-function formatCurrency(amount: number): string {
-  return "₹" + amount.toLocaleString("en-IN");
-}
 
-function formatDate(iso: string): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
-function formatTime(iso: string): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
-function getOrderIdDisplay(id: string): string {
-  return "#KM-" + id.slice(-5).toUpperCase();
-}
-
-function getInitials(name: string): string {
-  if (!name) return "??";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 /* ─── Sub-components ─────────────────────────── */
 function DetailItem({ icon, label, value }: { icon: string; label: string; value: ReactNode }) {
@@ -168,6 +138,7 @@ export default function FarmerOrderDetailPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [confirmStatus, setConfirmStatus] = useState<string | null>(null);
+  const [quickAction, setQuickAction] = useState<"confirm" | "cancel" | null>(null);
 
   // Redirect if not a farmer
   useEffect(() => {
@@ -192,16 +163,58 @@ export default function FarmerOrderDetailPage() {
         setNewStatus(res.data.order.status);
       })
       .catch((err) => {
-        if (err?.response?.status === 404) {
+        if (getApiErrorStatus(err) === 404) {
           setError("Order not found. It may have been removed or the link is incorrect.");
-        } else if (err?.response?.status === 403) {
+        } else if (getApiErrorStatus(err) === 403) {
           setError("You don't have permission to view this order.");
         } else {
-          setError(err?.response?.data?.message || err?.message || "Failed to load order details.");
+          setError(getApiErrorMessage(err, "Failed to load order details."));
         }
       })
       .finally(() => setLoading(false));
   }, [isAuthenticated, id, user?.role]);
+
+  // Quick-action: confirm order
+  const handleConfirmOrder = async () => {
+    if (!order) return;
+    setStatusUpdating(true);
+    setQuickAction(null);
+    try {
+      const res = await farmerAPI.confirmOrder(order._id);
+      setOrder(res.data.order);
+      setNewStatus(res.data.order.status);
+      showSuccess(`Order ${getOrderIdDisplay(order._id)} confirmed!`);
+      setStatusMessage(res.data.message || "Order confirmed successfully.");
+      setTimeout(() => setStatusMessage(null), 3500);
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to confirm order.");
+      setStatusError(msg);
+      showError(msg);
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  // Quick-action: cancel order
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    setStatusUpdating(true);
+    setQuickAction(null);
+    try {
+      const res = await farmerAPI.cancelOrder(order._id);
+      setOrder(res.data.order);
+      setNewStatus(res.data.order.status);
+      showSuccess(`Order ${getOrderIdDisplay(order._id)} cancelled.`);
+      setStatusMessage(res.data.message || "Order cancelled successfully.");
+      setTimeout(() => setStatusMessage(null), 3500);
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to cancel order.");
+      setStatusError(msg);
+      showError(msg);
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
 
   // Apply status update
   const handleApplyStatus = async () => {
@@ -217,8 +230,8 @@ export default function FarmerOrderDetailPage() {
       showSuccess(`Order ${getOrderIdDisplay(order._id)} marked as "${getStatusStyle(newStatus).label}".`);
       setStatusMessage(`Order status updated to "${getStatusStyle(newStatus).label}".`);
       setTimeout(() => setStatusMessage(null), 3500);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Failed to update order status.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to update order status.");
       setStatusError(msg);
       showError(msg);
     } finally {
@@ -320,6 +333,41 @@ export default function FarmerOrderDetailPage() {
           </Link>
         </div>
       </div>
+
+      {/* ─── Quick Action Buttons (pending order) ─── */}
+      {order.status === "pending" && (
+        <div className="mb-8 bg-primary-fixed/20 rounded-2xl border border-primary/20 p-6 print:hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+                <span className="material-symbols-outlined text-[24px] text-on-primary" style={{ fontVariationSettings: "'FILL' 1" }}>schedule</span>
+              </div>
+              <div>
+                <p className="font-headline-md text-headline-md text-primary">New Order Awaiting Confirmation</p>
+                <p className="text-label-sm text-on-surface-variant">Review the order and confirm to start preparing.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setQuickAction("cancel")}
+                disabled={statusUpdating}
+                className="px-6 py-3 border-2 border-error text-error font-label-md rounded-xl hover:bg-error/5 transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+                Decline
+              </button>
+              <button
+                onClick={() => setQuickAction("confirm")}
+                disabled={statusUpdating}
+                className="px-8 py-3 bg-primary text-on-primary font-label-md rounded-xl hover:opacity-90 transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95 shadow-lg"
+              >
+                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                Confirm Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Status messages ─── */}
       {statusMessage && (
@@ -603,6 +651,55 @@ export default function FarmerOrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ─── Quick-Action Confirmation Dialog ─── */}
+      {quickAction && order && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !statusUpdating && setQuickAction(null)} />
+          <div className="relative w-full max-w-md bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant p-8 animate-slideDown">
+            <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 ${
+              quickAction === "cancel" ? "bg-error-container" : "bg-primary-fixed"
+            }`}>
+              <span
+                className={`material-symbols-outlined text-[32px] ${quickAction === "cancel" ? "text-error" : "text-primary"}`}
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                {quickAction === "cancel" ? "cancel" : "check_circle"}
+              </span>
+            </div>
+            <h3 className="font-headline-md text-headline-md text-primary text-center mb-2">
+              {quickAction === "confirm" ? "Confirm This Order?" : "Decline This Order?"}
+            </h3>
+            <p className="text-body-md text-on-surface-variant text-center mb-6 max-w-sm mx-auto">
+              {quickAction === "confirm"
+                ? `Confirm order ${getOrderIdDisplay(order._id)} from ${order.consumer?.name || "the customer"}? The customer will be notified and you can start preparing.`
+                : `Cancel order ${getOrderIdDisplay(order._id)}? The customer will be notified. Product stock will be restored.`}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setQuickAction(null)}
+                disabled={statusUpdating}
+                className="flex-1 px-6 py-3 border border-outline-variant text-on-surface font-label-md rounded-xl hover:bg-surface-container transition-all disabled:opacity-50 active:scale-95"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={quickAction === "confirm" ? handleConfirmOrder : handleCancelOrder}
+                disabled={statusUpdating}
+                className={`flex-1 px-6 py-3 rounded-xl font-label-md text-white transition-all disabled:opacity-50 active:scale-95 ${
+                  quickAction === "cancel" ? "bg-error hover:opacity-90" : "bg-primary hover:opacity-90"
+                }`}
+              >
+                {statusUpdating
+                  ? "Processing..."
+                  : quickAction === "confirm"
+                  ? "Yes, Confirm Order"
+                  : "Yes, Decline Order"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Confirmation Dialog ─── */}
       {confirmStatus && order && (

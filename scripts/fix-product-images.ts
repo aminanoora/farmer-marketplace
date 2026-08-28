@@ -47,19 +47,20 @@ const AVATARS = {
     "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80",
 };
 
-// Map legacy product names to the correct replacement image
+// Map legacy product names to the correct replacement image.
+// Lookup is case-insensitive (e.g. "tomato" → IMAGES.tomatoes).
 const PRODUCT_IMAGE_BY_NAME: Record<string, string> = {
-  "Farm Fresh Potatoes": IMAGES.potatoes,
-  "Fresh Spinach Bundle": IMAGES.spinach,
-  "Organic Tomatoes": IMAGES.tomatoes,
-  "Crunchy Carrots": IMAGES.carrots,
-  "Sweet Green Peas": IMAGES.peas,
-  "Fresh Apples": IMAGES.apples,
-  "Seasonal Bananas": IMAGES.bananas,
-  "Whole Wheat Flour": IMAGES.wheat,
-  "Basmati Rice": IMAGES.rice,
-  "Fresh Milk": IMAGES.milk,
-  Tomato: IMAGES.tomatoes,
+  "farm fresh potatoes": IMAGES.potatoes,
+  "fresh spinach bundle": IMAGES.spinach,
+  "organic tomatoes": IMAGES.tomatoes,
+  "crunchy carrots": IMAGES.carrots,
+  "sweet green peas": IMAGES.peas,
+  "fresh apples": IMAGES.apples,
+  "seasonal bananas": IMAGES.bananas,
+  "whole wheat flour": IMAGES.wheat,
+  "basmati rice": IMAGES.rice,
+  "fresh milk": IMAGES.milk,
+  tomato: IMAGES.tomatoes,
 };
 
 const AVATAR_BY_NAME: Record<string, string> = {
@@ -68,7 +69,12 @@ const AVATAR_BY_NAME: Record<string, string> = {
   "Harpreet Singh": AVATARS.harpreet,
 };
 
+// Expired Google ephemeral URLs
 const OLD_PREFIX = "https://lh3.googleusercontent.com/aida-public/";
+// Legacy relative paths from the pre-Blob local-disk uploads. The /uploads
+// proxy was removed from next.config.js when uploads moved to Vercel Blob,
+// so these relative URLs 404 on the client and must be migrated too.
+const UPLOADS_PREFIX = "/uploads/";
 
 async function fix() {
   await mongoose.connect(MONGODB_URI);
@@ -82,15 +88,18 @@ async function fix() {
   let approved = 0;
 
   for (const p of products) {
-    const hadOldImage =
-      Array.isArray(p.images) &&
-      p.images.some((img: string) => String(img).startsWith(OLD_PREFIX));
+    const images = Array.isArray(p.images) ? p.images : [];
+    const hadOldImage = images.some((img: string) =>
+      String(img).startsWith(OLD_PREFIX)
+    );
+    const hadUploadsImage = images.some((img: string) =>
+      String(img).startsWith(UPLOADS_PREFIX)
+    );
 
-    const hadEmptyImages =
-      !Array.isArray(p.images) || p.images.length === 0;
+    const hadEmptyImages = images.length === 0;
 
-    if (hadOldImage || hadEmptyImages) {
-      const replacement = PRODUCT_IMAGE_BY_NAME[p.name];
+    if (hadOldImage || hadUploadsImage || hadEmptyImages) {
+      const replacement = PRODUCT_IMAGE_BY_NAME[String(p.name).toLowerCase()];
       if (replacement) {
         await db.collection("products").updateOne(
           { _id: p._id },
@@ -136,6 +145,14 @@ async function fix() {
 
   console.log(
     `\n✅ Done — products image-fixed: ${imagesFixed}, approved: ${approved}, avatars fixed: ${avatarsFixed}`
+  );
+  const remainingUploads = await db
+    .collection("products")
+    .countDocuments({ images: { $elemMatch: { $regex: "^/uploads/" } } });
+  console.log(
+    remainingUploads > 0
+      ? `⚠️  ${remainingUploads} product(s) still have /uploads/ images (no name mapping).`
+      : "🧹 No products with legacy /uploads/ images remain."
   );
   await mongoose.disconnect();
   process.exit(0);

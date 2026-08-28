@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { farmerAPI, consumerAPI } from "@/lib/api";
+import { farmerAPI, consumerAPI, getApiErrorMessage } from "@/lib/api";
 import { useNotification } from "@/lib/notification-context";
+import { formatCurrency } from "@shared/utils";
 
 // ─────────────────────────────────────────────────
 // Types
@@ -50,12 +51,6 @@ interface Category {
 // ─────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────
-function formatCurrency(amount: number): string {
-  return "₹" + amount.toLocaleString("en-IN", {
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function getStockInfo(qty: number) {
   if (qty <= 0) return { label: "Out of Stock", color: "bg-error-container text-error" };
@@ -157,7 +152,7 @@ export default function FarmerProductsPage() {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, any> = { page, limit: 10, sort };
+      const params: Record<string, string | number> = { page, limit: 10, sort };
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (categoryFilter !== "all") params.category = categoryFilter;
       if (statusFilter !== "all") params.status = statusFilter;
@@ -165,10 +160,10 @@ export default function FarmerProductsPage() {
       const res = await farmerAPI.getProducts(params);
       const data = res.data;
       setProducts(data.products || []);
-      setStats(data.stats || stats);
-      setPagination(data.pagination || pagination);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to load products.");
+      setStats((prev) => data.stats || prev);
+      setPagination((prev) => data.pagination || prev);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load products."));
     } finally {
       setLoading(false);
     }
@@ -183,8 +178,8 @@ export default function FarmerProductsPage() {
     try {
       await farmerAPI.updateProduct(productId, { isAvailable: !current });
       fetchProducts();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed to update product status.");
+    } catch (err: unknown) {
+      alert(getApiErrorMessage(err, "Failed to update product status."));
       fetchProducts(); // Revert UI
     }
   };
@@ -221,8 +216,8 @@ export default function FarmerProductsPage() {
       setDeleteId(null);
       showSuccess("Product deleted successfully!");
       fetchProducts();
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "Failed to delete product.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to delete product.");
       showError(msg);
     } finally {
       setDeleting(false);

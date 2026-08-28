@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { authAPI } from "@/lib/api";
+import { authAPI, getApiErrorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
 
@@ -124,8 +124,8 @@ export default function RegisterPage() {
       login(r.data.token, r.data.user);
       showSuccess("Account created successfully! Welcome to Krishi Market.");
       setTimeout(() => router.push("/"), 800);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || "Registration failed. Please try again.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Registration failed. Please try again.");
       setError(msg);
       showError(msg);
       triggerShake();

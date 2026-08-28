@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
-import { addressAPI } from "@/lib/api";
+import { addressAPI, getApiErrorMessage } from "@/lib/api";
 
 interface Address {
   _id: string;
@@ -79,7 +79,7 @@ export default function AddressPage() {
       .getAddresses()
       .then((res) => setAddresses(res.data.addresses || []))
       .catch((err) => {
-        setError(err?.response?.data?.message || err?.message || "Failed to load addresses.");
+        setError(getApiErrorMessage(err, "Failed to load addresses."));
       })
       .finally(() => setLoading(false));
   };
@@ -122,8 +122,8 @@ export default function AddressPage() {
       }
       setShowForm(false);
       fetchAddresses();
-    } catch (err: any) {
-      showError(err?.response?.data?.message || err?.message || "Failed to save address.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to save address."));
     } finally {
       setSubmitting(false);
     }
@@ -135,8 +135,8 @@ export default function AddressPage() {
       await addressAPI.deleteAddress(id);
       showSuccess("Address deleted.");
       fetchAddresses();
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to delete address.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to delete address."));
     }
   };
 
@@ -145,8 +145,8 @@ export default function AddressPage() {
       await addressAPI.setDefaultAddress(id);
       showSuccess("Default address updated.");
       fetchAddresses();
-    } catch (err: any) {
-      showError(err?.response?.data?.message || "Failed to update default address.");
+    } catch (err: unknown) {
+      showError(getApiErrorMessage(err, "Failed to update default address."));
     }
   };
 

@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useNotification } from "@/lib/notification-context";
 import { useCart } from "@/lib/cart-context";
-import { consumerAPI } from "@/lib/api";
+import { consumerAPI, getApiErrorMessage } from "@/lib/api";
+import { formatCurrency, formatDate, formatTime, getOrderIdDisplay } from "@shared/utils";
 
 /* ─── Types ──────────────────────────────────── */
 
@@ -66,26 +67,8 @@ function getStatusConfig(status: string) {
   return STATUS_CONFIG[status] || STATUS_CONFIG.pending;
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
-function formatTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
-function getOrderIdDisplay(id: string) {
-  return `#KM-${id.slice(-5).toUpperCase()}`;
-}
 
 function getItemsSummary(items: OrderItem[]) {
   return items.map((i) => `${i.name} (${i.quantity} ${i.unit})`).join(", ");
@@ -167,8 +150,8 @@ export default function OrdersPage() {
       );
       setCancelTarget(null);
       showSuccess("Order has been cancelled successfully.");
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || "Failed to cancel order.";
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Failed to cancel order.");
       setCancelError(msg); // Displayed inside the open dialog
     } finally {
       setCancelling(false);
@@ -184,7 +167,7 @@ export default function OrdersPage() {
       .getOrders()
       .then((res) => setOrders(res.data.orders || []))
       .catch((err) => {
-        const msg = err?.response?.data?.message || err?.message || "Failed to load orders";
+        const msg = getApiErrorMessage(err, "Failed to load orders");
         setError(msg);
       })
       .finally(() => setLoading(false));
@@ -439,7 +422,7 @@ export default function OrdersPage() {
                     <div className="col-span-2 flex md:block justify-between items-center">
                       <span className="md:hidden text-on-surface-variant font-label-sm uppercase">Total</span>
                       <span className="font-bold text-primary">
-                        ₹{order.totalAmount.toLocaleString("en-IN")}
+                        {formatCurrency(order.totalAmount)}
                       </span>
                     </div>
 

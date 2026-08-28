@@ -8,6 +8,9 @@ import productRoutes from "../../routes/product.routes";
 import categoryRoutes from "../../routes/category.routes";
 import orderRoutes from "../../routes/order.routes";
 import reviewRoutes from "../../routes/review.routes";
+import publicRoutes from "../../routes/public.routes";
+import addressRoutes from "../../routes/address.routes";
+import { maintenanceMode } from "../../middleware/maintenance.middleware";
 
 /**
  * Create a minimal Express app with routes mounted at /api.
@@ -16,6 +19,14 @@ import reviewRoutes from "../../routes/review.routes";
 export function createTestApp(): express.Application {
   const app = express();
   app.use(express.json());
+  // Maintenance mode middleware — blocks non-admin API routes
+  app.use("/api", (req, res, next) => {
+    if (req.path.startsWith("/admin")) {
+      next();
+      return;
+    }
+    maintenanceMode(req, res, next);
+  });
   app.use("/api/auth", authRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/farmers", farmerRoutes);
@@ -23,6 +34,8 @@ export function createTestApp(): express.Application {
   app.use("/api/categories", categoryRoutes);
   app.use("/api/orders", orderRoutes);
   app.use("/api/reviews", reviewRoutes);
+  app.use("/api/addresses", addressRoutes);
+  app.use("/api", publicRoutes);
   return app;
 }
 

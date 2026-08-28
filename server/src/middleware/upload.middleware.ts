@@ -4,7 +4,7 @@ import { put, del } from "@vercel/blob";
 import { env } from "../config/env";
 
 const fileFilter = (
-  _req: any,
+  _req: Express.Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {

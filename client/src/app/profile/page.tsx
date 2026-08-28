@@ -83,6 +83,10 @@ export default function ProfilePage() {
                   Farmer Dashboard
                 </Link>
               )}
+              <Link href="/profile/edit" className="px-6 py-3 bg-surface-container-high text-primary font-label-md rounded-xl hover:bg-surface-variant transition-all inline-flex items-center gap-2">
+                <span className="material-symbols-outlined">edit</span>
+                Edit Profile
+              </Link>
               <Link href="/orders" className="px-6 py-3 bg-primary text-on-primary font-label-md rounded-xl hover:opacity-90 transition-all inline-flex items-center gap-2">
                 <span className="material-symbols-outlined">receipt_long</span>
                 View My Orders

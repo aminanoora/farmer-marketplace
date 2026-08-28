@@ -8,6 +8,7 @@ import categoryRoutes from "./category.routes";
 import adminRoutes from "./admin.routes";
 import addressRoutes from "./address.routes";
 import publicRoutes from "./public.routes";
+import deliveryRoutes from "./delivery.routes";
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.use("/reviews", reviewRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/admin", adminRoutes);
 router.use("/addresses", addressRoutes);
+router.use("/deliveries", deliveryRoutes);
 router.use("/", publicRoutes);
 
 export default router;
